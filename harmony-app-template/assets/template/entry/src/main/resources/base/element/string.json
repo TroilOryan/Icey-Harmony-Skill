@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "App template module"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "App template"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "AppTemplate"
+    }
+  ]
+}

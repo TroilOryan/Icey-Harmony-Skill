@@ -1,0 +1,7 @@
+# 构建产物（模板副本不含，使用时由 DevEco 生成）
+.hvigor/
+build/
+node_modules/
+oh_modules/
+.idea/
+pack.info
