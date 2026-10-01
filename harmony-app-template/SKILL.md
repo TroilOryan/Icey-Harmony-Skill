@@ -11,11 +11,11 @@ description: >
   安全区/状态栏/全屏/挖孔/SafeArea/标题栏；
   图标/SFIcon/加个图标、运行日志/AppLogger/更新日志；
   hvigor 报错/safe-delete/编译不过/改了没生效
-version: 1.3.6
-changelog: "v1.3.6: 扩充 **LSN-025**（实色大卡改多卡光感）——补两条『改版后才暴露』的规则：① **只读内容块（备注 / 说明正文）同样要承载**：玻璃卡面上直接铺正文在深浅两色下都可能不清晰，应套一层与输入框同款容器（`surface` 底 + `borderRadius 12` + `0.5vp colors.fieldBorder` 描边），好处是『同一份内容表单页是 TextArea、详情页是同款承载』，视觉语言一致。② **详情/只读页字段为空时不要整块隐藏**：`if (hasNote) { 备注卡 }` ⇒ 用户分不清『没填』与『不支持』（本工程实证：详情页备注卡原为『无备注不渲染』→ 用户随即报『详情页要能显示备注』）；正解 = 字段卡**常驻** + 空值占位（『暂无备注』）⇒ 详情/只读页与表单页**相反**（表单页空字段不渲染更清爽，因为没有『这一栏存在与否』的疑问）。坑点速查表 +1 行；v1.3.5: 新增 **LSN-028**（**同一组件「点击 + 长按」+ 详情页自动刷新**，三坑皆『编译全绿、仅真机暴露』）：① `.onClick` 与 `.gesture(LongPressGesture)` **并存** ⇒ 长按命中后抬手**又触发点击** ⇒ 连跳两页（进编辑页又跳详情页）；正解 = **互斥手势组** `GestureGroup(GestureMode.Exclusive, LongPressGesture, TapGesture)`（『先满足条件者胜出』；❌ 不要 Parallel）。② 子页要在『外部数据变更后』刷新时，**别把重算结果放普通字段缓存**——刷新链尾段是『父重渲染会不会顺带重跑 @Builder』这一**不确定行为**，症状 = 编辑保存返回仍是旧值、退出重进才对；正解 = **`@State` 视图模型 + `@Watch` 驱动重算**（`@Watch` 写在状态装饰器**之前**，LSN-012）+ **入参只取 id、不持快照**（`repo.find(id)` 为 null ⇒ 渲染『记录不存在』兜底卡，不在 build 里 pop）。③ **`ForEach` 的 key 只写『身份』不写『值』** ⇒ 项还在、值变了 ⇒ 复用既有节点、不重跑 `@Builder` ⇒ 永远停在旧值；正解 = key 带上会变的值。坑点速查表 +3 行；v1.3.4: 新增 **LSN-027**（**长按手势**）：`Stack`/`Column` 等容器**没有 `.onLongPress` 修饰符**（写 `.onLongPress(...)` 报 `10505001 Property 'onLongPress' does not exist on type 'StackAttribute'/'ColumnAttribute'`）；正确写法 = **`LongPressGesture` 手势描述符 + 容器根节点 `.gesture(LongPressGesture({ duration: 500 }).onAction(...))`**，且 `LongPressGesture` 是 ArkUI **全局声明、无需 import**（`import { LongPressGesture } from '@kit.ArkUI'` 会报 `10311006 ... is not exported from Kit '@kit.ArkUI'`）。含挂载点选择（根容器 + `hitTestBehavior(None)` 承载层不拦截）、与宿主 `List` 滚动手势共存原理、`repeat` 适用场景，以及「点击改长按」时的**口径变更规范**（`.onClick` 整段替换 + 回调属性同步改名让调用点漏改编译失败 + 复用组件回调做带默认空实现的可选属性）。坑点速查表 +1 行；v1.3.3: 扩充 **LSN-023**（自定义壁纸）——补『**两组载体各自的蒙版来源**』对照表：主界面 = `Index` 的 `HdsNavigation.backgroundColor`（`colors.background`，壁纸时 ≈70% 白，整屏压暗）+ `buildHomeTitleBar` 滚动蒙层 `#CCFFFFFF`（80% 白块）；子页 = `SubPageScaffold` 条件透明 + `buildSubPageTitleBar(..., true, ...)`。子页默认已透明、**主界面极易漏**（本模板即出现『子页干净、主界面发白』）。附两处排查细节：`HdsNavigation` 属性链上 `backgroundColor` **可能写了两次（后写生效）**；根 `Stack` 底色在壁纸 `Image` **之下**，应保留不透明作解码兜底。坑点速查表 +1 行；v1.3.2: 新增 LSN-026（**沉浸光感必须有「可采样底层」**：材质采样的是组件背后的窗口内容，页面背景若是**纯色**（无壁纸/无内容）⇒ 材质/毛玻璃无信息可采，卡片退化成『与页面同色的灰玻璃』，浅色下只剩一圈模糊边。修法：把『有底层』做成 `materialActive(forceOn, backdrop)` 的**第二形参**（漏改即编译失败），无底层时**不下发材质**并回落实色卡底（`cardBg` 白/深灰）+ 去掉模糊；hero 卡回不透明渐变、chips 回实色、弹窗底改不透明。诊断串加『底层』一档）；坑点速查表 +1 行；v1.3.1: 新增 LSN-025（**实色大卡改多卡光感的三件事**：① 卡内控件可辨性——卡片从实色 cardBg 换玻璃后 `surface` 浅填充与卡面几乎同色导致『输入框消失』，须加 0.5vp `colors.fieldBorder` 发丝描边（保留实色填充 ⇒ 文字对比度不受材质影响）；`surface` 次级按钮直接贴页面背景同理几乎不可见 ⇒ 操作区须留在卡片内；② **属性链必须写在内层容器 `}` 之后、外层自定义组件 `}` 之前**，写成 `}`→`}`→`.width()` 会报 `10505001 Declaration or statement expected` + `Cannot find name 'width'`（报错点比真实元凶低一层，与附录 D7 同源）；③ 分卡边界直接取原 `sectionTitle` 锚点，`if (分支)` 内可放多个 ListItem，标题样式统一为卡片标题规格）；坑点速查表 +2 行；v1.3.0: ★ 沉浸光感材质 + 自定义壁纸 双能力沉淀。①【光感】模板内置 services/SystemMaterial.ets（惰性构造 ImmersiveMaterial / 三档缓存 / applyMaterialCarrier / pressLightColor / fallbackSurface / materialDiagnostics 诊断）+ components/MaterialCard（MaterialCardLayer 承载层——仅 ToggleType.Button 可承载整块矩形材质，五条属性缺一不可；MaterialCard 卡片外壳 + 降级毛玻璃）；坑点速查表 +5 行（承载层写法 / 不显示四排查 / photoUris 字段 / 资源引用成对检查）。新增 LSN-022（光感四条层级规则 / 承载层五条属性 / 三件事降级 / 四形态接入）、LSN-023（壁纸 photoUris + 三链路重放）、LSN-024（资源引用报错指向中间产物）。②【模板修复】compatibleSdkVersion 6.1.0(23)→26.0.0（光感为 API 26 能力）；修复 startWindowIcon 残留引用 $media:tab_music 资源缺失；**修复全部 23 个既有 ArkTS 编译错误，模板 assembleHap 构建通过**（getInstance 漂移 / Blank 嵌套 / 缺 import / bindSheet 挂自定义组件 / 可选字段未判空——错误模式已登记「模板健康状态」）。v1.2.0: 图标体系换代 + SDK 版本书写规范修正。①【图标】按用户要求**弃用自研 SVG 图标组件、统一改用鸿蒙官方符号** `SymbolGlyph($r('sys.symbol.*'))`——零资源文件、随字体缩放、`.fontColor([...])` 支持分层多色；同步迁移内置模板（SettingItem 的 `icon:string`→`iconSymbol:Resource`、SettingsGroupEntry 同改、Index 的 4 个 Tab 与各页图标）并**删除 SFIcon 组件与 28 个失效 SVG**；新增 LSN-020（含选名方法、`$r` 编译期字面量约束、组件 API 变形、易错点、本项目符号映射表、以及『符号名写错不报错只是空白 ⇒ 必须截图验证』）。②【SDK】新增 LSN-021 并**修正 D5**：SDK 版本号格式**按 API 级别分界**——API < 26 用 `x.y.z(api)`，**API ≥ 26 用点分制 `major.minor.patch`**（读 hvigor 源码 `FIRST_DOT_API_VERSION = 26` + 官方文档双重确认）；给 26 加 `(26)` 报 00308018、26 前漏 `(api)` 报 00306042；坑点速查表 +3 行；v1.1.11: 新增 LSN-019「@Builder 按值传参不刷新——改了值界面不变、但重开又对了」。含同文件『对照实验』确诊法（同一状态机制下，内联 Row 正常 / 走 @Builder 异常 ⇒ 唯一差异即元凶）、三种修法（内联 build / 对象字面量按引用传参 / 子组件 @Prop）、同根因的其余受害者（分段控件 selected 高亮、开关行 isOn 回显、动态 fieldLabel 文案），以及**极易骗人的验证姿势警告**：别用"保存后重开看值对不对"验证（值本来就对，会误判为无 bug），必须停留在当前页看 UI 是否即时刷新。坑点速查表 +1 行；v1.1.10: 新增 LSN-018「启动竞态：AppStorage.set 对不存在的键静默空操作 → 列表页永久加载中」，含双重根因分析（写入落空 + 无条件建键覆盖）、三处协同修法、isReady() 约定与验证姿势；同步修复内置模板（附录 C 新增 D10）；坑点速查表 +1 行；v1.1.9: 新增 LSN-017「签名与安装三连坑」——① signingConfigs 声明≠使用（product 必须显式 signingConfig 才产出 signed hap，否则 9568320 no signature file）；② 改 bundleName 后 IDE 缓存 .idea/.deveco/project.cache.json 仍用旧包名，必须 Sync；③ 签名无法靠「Hap Signature Block 魔数」或「条目 diff」判定，唯一可靠判据是解包检索 kebab-case 的 bundle-name/app-identifier/debug-info（含 hdc 真机验证标准动作）；铁律 +2 条（#38/#39）、坑点速查表 +2 行；v1.1.8: 新增 LSN-016「跨组件传 @Builder 会丢 this——菜单能弹出、点一下才崩（undefined is not callable）」，含三步闭锁定性法 + 配置化替代方案（@Prop 数据 + 普通函数属性回调）；坑点速查表 +2 行；同步修复内置模板 SettingItem 的 @BuilderParam menu 缺陷；v1.1.7: 新增 LSN-015「跨组件只传展示型数据类」（@Prop 深拷贝会丢方法 + 视图层禁止重算业务值，两条约束指向同一架构）；坑点速查表再 +2 行（ListView 子项里的横向滚动条必须显式设高、给子组件传列表数据要用纯数据类）；v1.1.6: 新增 LSN-014「width('100%') 与横向 margin 不可同挂」（卡片右端被 List 裁切成直角，用户报「显示不全」；含截图逐像素取证法 + 横向内缩统一归宿主 List padding 的规范写法）；坑点速查表新增「卡片左右内缩」行；v1.1.5: 新增附录 C 缺陷 D5~D9（模板原样复制后 4 处必然编译失败：targetSdkVersion 格式非法 / HdsNavigationTitleBarOptions 未 import / 自定义组件后链式 bindSheet / Blank 直接作 ListItem 子组件）；新增 LSN-013 模板缺陷清单与坑点速查表同步；v1.1.4: LSN-012 @Watch 顺序与跨 Tab 级联"
+version: 1.3.9
+changelog: "v1.3.9: 新增 **LSN-031**（**Canvas 自绘正文「长按划选」+ 功能面横向铺开**）——来源：Icey-Reader 用户要求「照着 legado 把该做的功能都做了」，阅读页一轮补齐书签/笔记/划选/书内搜索/阅读统计/书架分组/排版扩展，全部用鸿蒙特性（沉浸光感/符号/系统组件）。五条坑：① **Canvas 字符命中禁比例估下标**，走三层收敛 = `localX/px2vp − 页边距` ⇒ 页内容区；按行 y 区间定位行（`行高 = 字号 × lineSpacing`，**标题行字号 +2**）；行内找「最后一个左缘 ≤ cx」的字形、过右缘中点 +1 ⇒ 章内偏移 `line.charStart + idx`；★ **排版期必须存每行 charStart**，交互期无法反推。② **划选与翻页同一手势分流**：复用既有 PanGesture（selecting 态改作 extendSelect，否则翻页），❌ 不要新增第二个 Pan；进入划选用 LongPressGesture({repeat:false,duration:400})，退出后直接 return 不再触发翻页。③ **划选底衬逐行画**：选中区间是章内偏移、绘制在当前页坐标系 ⇒ 求行∩区间交集后逐行 fillRect（accent alpha≈0.22，叠在文字之下）；直接拿 selStart/selEnd 当 x/y 会跑到页外。④ **跨页返回先问 has**：管理页可能从书架→详情页进入、栈里没有阅读页 ⇒ 一律 pop() 退到错页；正解 = AppRouter.has(ROUTE_READER) ? pop() : push(ROUTE_READER, bookUrl)；多入口共用一条 @StorageLink 信号，@Watch 消费后立即清空。⑤ **功能面横铺三必查**：`$r('sys.symbol.xxx')` 先核 id_defined.json（写错不报错只渲染空白）；单文件同模块只写一行 import（拆两行视同重复声明）；新成员写到 struct 的 `}` 之后会引发几十条级联假错误（Property 'xxx' does not exist + UI component 'Column' cannot be used in this place），元凶在报错点之外 ⇒ 扫「独占一行的 }」定位提前闭合处（实证 615 行），别逐条改。坑点速查表 +3 行；v1.3.8: 新增 **LSN-030**（**存 URI 不复制文件 ⇒ 每次启动必须重新 activatePermission**，漏掉=重启后静默白屏）——🔴 极难定位：症状是「**导入当次完全正常、杀进程重开就白屏**」，代码零报错，画布只剩一层底色。机理三步：① 本地书/音乐不拷进沙箱 ⇒ 仓库存**原始 URI**，正文靠 fileShare 持久授权直读；② `persistPermission` 跨重启**不自动生效**，必须每次启动逐 URI 调 `activatePermission`（旧文 LSN-023 写的「picker URI 自带永久授权、persist/activate 仅作保险」**只在本次进程内成立**，已修正）；③ 漏掉 ⇒ `openSync` 抛 `13900001 EPERM` ⇒ catch 静默 return ⇒ 渲染层拿空内容 ⇒ 纯色白屏。正解双保险 = 启动链路 `await BookRepo.activatePermissions()` + 读取路径 `FilePermission.ensureActive(uri)`；参考实现见 Icey-Player-Harmony `MediaScanner.ets:540`（注释原文「存原始 URI，重启后通过 activatePermission 恢复访问，不复制文件」）。配套确立 **绝不静默失败**：凡「内容读到空 ⇒ 界面整片空」的路径（记录缺失/目录为空/**正文 0 字**/排版 0 页/读文件抛异常）都必须渲染**可见错误态 + 重试入口**。坑点速查表 +2 行。来源：Icey-Reader 阅读器两次报白屏，前几轮误判在 canvas 尺寸/排版口径，真因是剪裁模板时漏抄权限激活；v1.3.7: 新增 **LSN-029**（`.gitignore` 签名约定）——修正本 Skill 内置模板 `assets/template/.gitignore` 第 13 行的**裸 `signing/`**：此写法会把整个签名目录忽略（仓库里一个 p7b/cer/p12/csr 都没有，新机器 clone 后构建不出可安装包、安装报 `9568320 no signature file`，且 `git status` 里永远看不见，极易漏提交）。定案规则 = **签名材料必须进仓库**，只忽略 `/signing/material/` 与 `/signing/debug/material/`（hap-sign-tool 哈希中间缓存，每次构建可重建）。⚠️ 两条都要写（参考项目只写了前者，漏掉 debug 下的 material）；⚠️ 验证口径用 `git ls-files | grep material`（`git check-ignore` 判目录不可信）。坑点速查表 +1 行；v1.3.6: 扩充 **LSN-025**（实色大卡改多卡光感）——补两条『改版后才暴露』的规则：① **只读内容块（备注 / 说明正文）同样要承载**：玻璃卡面上直接铺正文在深浅两色下都可能不清晰，应套一层与输入框同款容器（`surface` 底 + `borderRadius 12` + `0.5vp colors.fieldBorder` 描边），好处是『同一份内容表单页是 TextArea、详情页是同款承载』，视觉语言一致。② **详情/只读页字段为空时不要整块隐藏**：`if (hasNote) { 备注卡 }` ⇒ 用户分不清『没填』与『不支持』（本工程实证：详情页备注卡原为『无备注不渲染』→ 用户随即报『详情页要能显示备注』）；正解 = 字段卡**常驻** + 空值占位（『暂无备注』）⇒ 详情/只读页与表单页**相反**（表单页空字段不渲染更清爽，因为没有『这一栏存在与否』的疑问）。坑点速查表 +1 行；v1.3.5: 新增 **LSN-028**（**同一组件「点击 + 长按」+ 详情页自动刷新**，三坑皆『编译全绿、仅真机暴露』）：① `.onClick` 与 `.gesture(LongPressGesture)` **并存** ⇒ 长按命中后抬手**又触发点击** ⇒ 连跳两页（进编辑页又跳详情页）；正解 = **互斥手势组** `GestureGroup(GestureMode.Exclusive, LongPressGesture, TapGesture)`（『先满足条件者胜出』；❌ 不要 Parallel）。② 子页要在『外部数据变更后』刷新时，**别把重算结果放普通字段缓存**——刷新链尾段是『父重渲染会不会顺带重跑 @Builder』这一**不确定行为**，症状 = 编辑保存返回仍是旧值、退出重进才对；正解 = **`@State` 视图模型 + `@Watch` 驱动重算**（`@Watch` 写在状态装饰器**之前**，LSN-012）+ **入参只取 id、不持快照**（`repo.find(id)` 为 null ⇒ 渲染『记录不存在』兜底卡，不在 build 里 pop）。③ **`ForEach` 的 key 只写『身份』不写『值』** ⇒ 项还在、值变了 ⇒ 复用既有节点、不重跑 `@Builder` ⇒ 永远停在旧值；正解 = key 带上会变的值。坑点速查表 +3 行；v1.3.4: 新增 **LSN-027**（**长按手势**）：`Stack`/`Column` 等容器**没有 `.onLongPress` 修饰符**（写 `.onLongPress(...)` 报 `10505001 Property 'onLongPress' does not exist on type 'StackAttribute'/'ColumnAttribute'`）；正确写法 = **`LongPressGesture` 手势描述符 + 容器根节点 `.gesture(LongPressGesture({ duration: 500 }).onAction(...))`**，且 `LongPressGesture` 是 ArkUI **全局声明、无需 import**（`import { LongPressGesture } from '@kit.ArkUI'` 会报 `10311006 ... is not exported from Kit '@kit.ArkUI'`）。含挂载点选择（根容器 + `hitTestBehavior(None)` 承载层不拦截）、与宿主 `List` 滚动手势共存原理、`repeat` 适用场景，以及「点击改长按」时的**口径变更规范**（`.onClick` 整段替换 + 回调属性同步改名让调用点漏改编译失败 + 复用组件回调做带默认空实现的可选属性）。坑点速查表 +1 行；v1.3.3: 扩充 **LSN-023**（自定义壁纸）——补『**两组载体各自的蒙版来源**』对照表：主界面 = `Index` 的 `HdsNavigation.backgroundColor`（`colors.background`，壁纸时 ≈70% 白，整屏压暗）+ `buildHomeTitleBar` 滚动蒙层 `#CCFFFFFF`（80% 白块）；子页 = `SubPageScaffold` 条件透明 + `buildSubPageTitleBar(..., true, ...)`。子页默认已透明、**主界面极易漏**（本模板即出现『子页干净、主界面发白』）。附两处排查细节：`HdsNavigation` 属性链上 `backgroundColor` **可能写了两次（后写生效）**；根 `Stack` 底色在壁纸 `Image` **之下**，应保留不透明作解码兜底。坑点速查表 +1 行；v1.3.2: 新增 LSN-026（**沉浸光感必须有「可采样底层」**：材质采样的是组件背后的窗口内容，页面背景若是**纯色**（无壁纸/无内容）⇒ 材质/毛玻璃无信息可采，卡片退化成『与页面同色的灰玻璃』，浅色下只剩一圈模糊边。修法：把『有底层』做成 `materialActive(forceOn, backdrop)` 的**第二形参**（漏改即编译失败），无底层时**不下发材质**并回落实色卡底（`cardBg` 白/深灰）+ 去掉模糊；hero 卡回不透明渐变、chips 回实色、弹窗底改不透明。诊断串加『底层』一档）；坑点速查表 +1 行；v1.3.1: 新增 LSN-025（**实色大卡改多卡光感的三件事**：① 卡内控件可辨性——卡片从实色 cardBg 换玻璃后 `surface` 浅填充与卡面几乎同色导致『输入框消失』，须加 0.5vp `colors.fieldBorder` 发丝描边（保留实色填充 ⇒ 文字对比度不受材质影响）；`surface` 次级按钮直接贴页面背景同理几乎不可见 ⇒ 操作区须留在卡片内；② **属性链必须写在内层容器 `}` 之后、外层自定义组件 `}` 之前**，写成 `}`→`}`→`.width()` 会报 `10505001 Declaration or statement expected` + `Cannot find name 'width'`（报错点比真实元凶低一层，与附录 D7 同源）；③ 分卡边界直接取原 `sectionTitle` 锚点，`if (分支)` 内可放多个 ListItem，标题样式统一为卡片标题规格）；坑点速查表 +2 行；v1.3.0: ★ 沉浸光感材质 + 自定义壁纸 双能力沉淀。①【光感】模板内置 services/SystemMaterial.ets（惰性构造 ImmersiveMaterial / 三档缓存 / applyMaterialCarrier / pressLightColor / fallbackSurface / materialDiagnostics 诊断）+ components/MaterialCard（MaterialCardLayer 承载层——仅 ToggleType.Button 可承载整块矩形材质，五条属性缺一不可；MaterialCard 卡片外壳 + 降级毛玻璃）；坑点速查表 +5 行（承载层写法 / 不显示四排查 / photoUris 字段 / 资源引用成对检查）。新增 LSN-022（光感四条层级规则 / 承载层五条属性 / 三件事降级 / 四形态接入）、LSN-023（壁纸 photoUris + 三链路重放）、LSN-024（资源引用报错指向中间产物）。②【模板修复】compatibleSdkVersion 6.1.0(23)→26.0.0（光感为 API 26 能力）；修复 startWindowIcon 残留引用 $media:tab_music 资源缺失；**修复全部 23 个既有 ArkTS 编译错误，模板 assembleHap 构建通过**（getInstance 漂移 / Blank 嵌套 / 缺 import / bindSheet 挂自定义组件 / 可选字段未判空——错误模式已登记「模板健康状态」）。v1.2.0: 图标体系换代 + SDK 版本书写规范修正。①【图标】按用户要求**弃用自研 SVG 图标组件、统一改用鸿蒙官方符号** `SymbolGlyph($r('sys.symbol.*'))`——零资源文件、随字体缩放、`.fontColor([...])` 支持分层多色；同步迁移内置模板（SettingItem 的 `icon:string`→`iconSymbol:Resource`、SettingsGroupEntry 同改、Index 的 4 个 Tab 与各页图标）并**删除 SFIcon 组件与 28 个失效 SVG**；新增 LSN-020（含选名方法、`$r` 编译期字面量约束、组件 API 变形、易错点、本项目符号映射表、以及『符号名写错不报错只是空白 ⇒ 必须截图验证』）。②【SDK】新增 LSN-021 并**修正 D5**：SDK 版本号格式**按 API 级别分界**——API < 26 用 `x.y.z(api)`，**API ≥ 26 用点分制 `major.minor.patch`**（读 hvigor 源码 `FIRST_DOT_API_VERSION = 26` + 官方文档双重确认）；给 26 加 `(26)` 报 00308018、26 前漏 `(api)` 报 00306042；坑点速查表 +3 行；v1.1.11: 新增 LSN-019「@Builder 按值传参不刷新——改了值界面不变、但重开又对了」。含同文件『对照实验』确诊法（同一状态机制下，内联 Row 正常 / 走 @Builder 异常 ⇒ 唯一差异即元凶）、三种修法（内联 build / 对象字面量按引用传参 / 子组件 @Prop）、同根因的其余受害者（分段控件 selected 高亮、开关行 isOn 回显、动态 fieldLabel 文案），以及**极易骗人的验证姿势警告**：别用"保存后重开看值对不对"验证（值本来就对，会误判为无 bug），必须停留在当前页看 UI 是否即时刷新。坑点速查表 +1 行；v1.1.10: 新增 LSN-018「启动竞态：AppStorage.set 对不存在的键静默空操作 → 列表页永久加载中」，含双重根因分析（写入落空 + 无条件建键覆盖）、三处协同修法、isReady() 约定与验证姿势；同步修复内置模板（附录 C 新增 D10）；坑点速查表 +1 行；v1.1.9: 新增 LSN-017「签名与安装三连坑」——① signingConfigs 声明≠使用（product 必须显式 signingConfig 才产出 signed hap，否则 9568320 no signature file）；② 改 bundleName 后 IDE 缓存 .idea/.deveco/project.cache.json 仍用旧包名，必须 Sync；③ 签名无法靠「Hap Signature Block 魔数」或「条目 diff」判定，唯一可靠判据是解包检索 kebab-case 的 bundle-name/app-identifier/debug-info（含 hdc 真机验证标准动作）；铁律 +2 条（#38/#39）、坑点速查表 +2 行；v1.1.8: 新增 LSN-016「跨组件传 @Builder 会丢 this——菜单能弹出、点一下才崩（undefined is not callable）」，含三步闭锁定性法 + 配置化替代方案（@Prop 数据 + 普通函数属性回调）；坑点速查表 +2 行；同步修复内置模板 SettingItem 的 @BuilderParam menu 缺陷；v1.1.7: 新增 LSN-015「跨组件只传展示型数据类」（@Prop 深拷贝会丢方法 + 视图层禁止重算业务值，两条约束指向同一架构）；坑点速查表再 +2 行（ListView 子项里的横向滚动条必须显式设高、给子组件传列表数据要用纯数据类）；v1.1.6: 新增 LSN-014「width('100%') 与横向 margin 不可同挂」（卡片右端被 List 裁切成直角，用户报「显示不全」；含截图逐像素取证法 + 横向内缩统一归宿主 List padding 的规范写法）；坑点速查表新增「卡片左右内缩」行；v1.1.5: 新增附录 C 缺陷 D5~D9（模板原样复制后 4 处必然编译失败：targetSdkVersion 格式非法 / HdsNavigationTitleBarOptions 未 import / 自定义组件后链式 bindSheet / Blank 直接作 ListItem 子组件）；新增 LSN-013 模板缺陷清单与坑点速查表同步；v1.1.4: LSN-012 @Watch 顺序与跨 Tab 级联"
 ---
 
-# 鸿蒙 App 模板基建 v1.3.6
+# 鸿蒙 App 模板基建 v1.3.9
 
 > 📦 **本 Skill 自带模板工程副本**（`assets/template/`，79 文件 / 1.2MB）——
 > 整个 Skill 目录拷到任何机器都能直接起新鸿蒙 App，不依赖外部工程。
@@ -290,7 +290,13 @@ changelog: "v1.3.6: 扩充 **LSN-025**（实色大卡改多卡光感）——补
 | 同一组件既要「点击」又要「长按」（如列表卡：点击看详情 / 长按编辑） | `.onClick(...)` + `.gesture(LongPressGesture(...))` **并存**（两个独立手势）：长按命中后抬手**又触发点击** ⇒ 连跳两页（进编辑页又跳详情页）。编译全绿、只有真机暴露 | 绑成**互斥手势组**：`.gesture(GestureGroup(GestureMode.Exclusive, LongPressGesture({duration:500}).onAction(...), TapGesture({count:1}).onAction(...)))` —— 独占模式"先满足条件者胜出"。❌ 不要 `GestureMode.Parallel`（两个都触发）（见 LSN-028） |
 | 子页需要「外部数据变更后自动刷新」（编辑保存返回详情要显示新值） | 把重算结果放**普通字段缓存**、在 `build()` 里读 ⇒ 刷新链尾段是"父组件重渲染**会不会顺带重跑 `@Builder`**"这一**不确定行为** ⇒ 返回后仍是旧值、退出重进才对 | 用 **`@State` 持有视图模型 + `@Watch` 驱动重算**（`@Watch` 写在状态装饰器**之前**，LSN-012）；入参**只取 id、不持快照**，页面永远 `repo.find(id)`，取到 `null` 渲染「记录不存在」兜底卡（见 LSN-028） |
 | `ForEach` 里的数值变了但界面不更新（编辑后明细行还显示旧值） | key 只写"身份"：`(r) => \`kv_${r.label}\`` ⇒ 项还在、值变了 ⇒ **key 不变 ⇒ 复用既有节点、不重跑 `@Builder`** | key 里**带上会变的值**：`\`kv_${r.label}_${r.value}_${r.accent}_${r.isLast}\``。同理列表页 key 带上 `_${this.assetsVersion}` 做双保险（见 LSN-028） |
+| 新建工程/写 `.gitignore` 或把工程推上 Git | 照抄模板 `.gitignore` 的裸 `signing/` ⇒ **整个签名目录被忽略**，仓库里没有 p7b/cer/p12/csr；`git status` 里永远看不到，clone 到新机器构建不出可安装包（`unsigned.hap` / `9568320 no signature file`） | **签名材料必须进仓库**：只忽略 `/signing/material/` + `/signing/debug/material/`（hap-sign-tool 哈希缓存，可重建）。⚠️ 两条都要写（只写前者会漏掉 debug 下的 material）；⚠️ `git check-ignore` 判目录不可信，用 `git ls-files \| grep material` 复核（见 LSN-029） |
 | 详情/只读页的某个字段为空 | 整块隐藏（`if (hasNote) { 备注卡 }`）⇒ 用户**分不清"没填"还是"不支持"**（本工程实测：详情页备注卡「无备注不渲染」，随即被用户报「详情页要能显示备注」） | **详情/只读页的字段卡常驻**，空值给占位文案（「暂无备注」）——"这一栏存在"本身要被表达出来。表单/编辑页相反：空字段不渲染更清爽（没有"存在与否"的疑问）。备注等正文块要用与输入框同款承载（`surface` + 0.5vp `fieldBorder` 描边），别直接铺在玻璃上（见 LSN-025） |
+| 本地书/音乐"存入库、不复制文件"后**重启打不开**（导入当次正常、重开白屏/无声） | 只调了 `FilePermission.persist([uri])`，**没有每次启动 `activatePermission`**。持久授权跨重启不自动生效 ⇒ `openSync(原始URI)` 抛 `13900001 EPERM` ⇒ 读取 catch 静默 return ⇒ 画布/列表全空 | ① 启动恢复链路（`EntryAbility.startupReady`，数据仓库 init **之后**）加 `await BookRepo.activatePermissions()`（遍历全部 bookUrl 调 `FilePermission.activate`）；② 读取路径加 `FilePermission.ensureActive(uri)` 单条兜底。★ 指纹 = **导入当次能看、杀进程重开就白**；日志找 `13900001`/`EPERM`（见 LSN-030） |
+| 读取失败导致"整片空白"的页面（阅读页纯色、列表空态） | catch 里只 `AppLogger.error(...)` 然后 return ⇒ 用户看到一块底色，**没有任何提示**，长相差不多的根因（权限/文件移动/偏移错位）无法区分，排查几轮都在猜 | **绝不静默失败**：把失败落到 `@State loadError`，渲染**可见错误态 + 重试按钮**；并对"内容为空""排版 0 页"等**非异常**分支同样报错（见 LSN-030） |
+| 给 Canvas 自绘的正文加"长按划选" | 用**比例**估字符下标（`x / 行宽`、`y / 页高`）⇒ 随字号 / 字距 / 段距变化**必然错位**（多选少选一个字、跨行乱选）。且排版产物只有整串文本、**没有每行的 `charStart`** ⇒ 拿不到章内偏移，选中的内容无法与书签 / 笔记定位对齐 | **三层收敛**：① `localX/px2vp − 页边距` ⇒ 页内容区坐标；② 按行的 y 区间定位行，`行高 = 字号 × lineSpacing`，**标题行字号 +2**（行高不同）；③ 行内找**最后一个左缘 ≤ cx** 的字形，过其右缘中点则 +1 ⇒ 章内偏移 `line.charStart + idx`。★ **排版期就把每行 `charStart` 存下来**，别在交互期反推。底衬要**逐行画**（求行 ∩ 选中区间的交集），不能拿章内偏移当页面坐标（见 LSN-031） |
+| 在已有 struct 里新增 `@Builder` / 方法 | 把新成员写到结构体 `}` **之后**（如插在文件末尾）⇒ 一条改动引发**几十条级联假错误**：`Property 'xxx' does not exist on type 'Xxx'` + `UI component 'Column' cannot be used in this place` + `Cannot find name 'b'`。**元凶不在报错点上**，逐条改会白费 | 用脚本扫「**独占一行的 `}`**」定位那个提前闭合处（本工程实证在 615 行），把成员**移回结构体内**（去掉多余的 `}`）即可，别按报错逐条补（见 LSN-031） |
+| 从管理页（书签列表 / 搜索结果）跳回阅读页 | 一律 `pop()` ⇒ 若用户是从**书架 → 书籍详情页**进入的管理页，路由栈里**没有阅读页** ⇒ pop 退到**错页**（详情页）而不是阅读页 | 先判存在再决定：`AppRouter.has(ROUTE_READER) ? pop() : push(ROUTE_READER, bookUrl)`（`has(name) = getAllPathName().indexOf(name) >= 0`）。配套：多个入口**共用一条 `@StorageLink` 跳转信号**，消费方 `@Watch` 读到后**立即清空**（见 LSN-031） |
 
 ---
 
@@ -877,7 +883,10 @@ SDK 版本号的**书写格式按 API 级别分界**（API ≥ 26 用点分制 `
   ① 字段名是 **`photoUris`**（`PhotoSelectResult` 是 class，定义在 openharmony 侧
   `@ohos.file.photoAccessHelper.d.ts`，**不是 hms 目录**；网络资料常误写 `uris`）
   ② `PhotoSelectOptions` 对象字面量必须**显式类型标注**（`arkts-no-untyped-obj-literals`）
-  ③ SDK 文档注明 picker 返回的 URI **自带永久授权**——`FilePermission.persist/activate` 仅作保险
+  ③ **⚠️ 反例（2026-09-29 修正）**：**不要**写「picker 返回的 URI 自带永久授权，`persist/activate` 仅作保险」——
+     这只对「**本次进程内**」成立。把 URI 存起来**跨重启**再用（书库/音乐库这类"存原始 URI 不复制文件"的
+     场景），**持久授权必须每次启动重新 `activatePermission`**，否则 `openSync(uri)` 抛
+     13900001(EPERM)。详见 **LSN-030**（本条曾误导 Icey-Reader 的阅读器漏掉启动激活 → 重启后白屏）
 - **持久化**：SettingsManager 五步新增 `customBgUri`（键 `settings_customBgUri`）；
   **键名与模板 `SubPageScaffold` 的既有订阅一致 → 子页自动获得同一壁纸，零成本**
 - **主题联动**：`ThemeManager.setCustomBg(has)` —— 有壁纸时页面背景色变**半透明**
@@ -1118,6 +1127,158 @@ ForEach(v.rows, (r: KvRow) => { this.kvRow(r) },
 
 ---
 
+### LSN-029 `.gitignore` 签名约定：`signing/` 必须进仓库，**只忽略 `material/` 缓存**
+
+- **风险**：🔴 仓库里一个签名文件都没有 ⇒ 新机器 clone 后 `assembleHap` 产不出可安装包
+  （`entry-default-unsigned.hap` / 安装报 `9568320 no signature file`），
+  也无法复现签名类问题（`00303074` p7b bundle-name 不匹配等）。
+  排查时才发现"拿不到 profile，只能回头补提交"。
+- **场景**：2026-09-29 Icey-Reader —— 照抄本 Skill 内置模板的 `.gitignore`，
+  其第 13 行是**裸的 `signing/`** ⇒ 整个签名目录被 ignore，`git status` 永远看不见；
+  用户复核 commit 时发现并纠正。
+- **定案规则**（与 Icey-Player-Harmony 同约定）：
+
+  ```gitignore
+  **/.test
+  /.appanalyzer
+
+  # 签名文件：**不忽略**（可复现构建的必要部分）
+  # 例外：material/ 是 hap-sign-tool 生成的哈希命名中间缓存，每次构建可重建
+  /signing/material/
+  /signing/debug/material/
+  ```
+
+  | 路径 | 是否版本化 | 理由 |
+  |---|---|---|
+  | `signing/debug/*.p7b` `.cer` `.p12` `.csr` | ✅ 进仓库 | 唯一能让新机器构建出**可安装** HAP 的材料 |
+  | `signing/release.*` | ✅ 进仓库 | 同上（发布链） |
+  | `signing/**/material/**` | ❌ 忽略 | 签名工具中间缓存，哈希命名，可重建 |
+
+- **⚠️ 易错点**：参考项目（Icey-Player-Harmony）实际只写了 `/signing/material/`，
+  **漏了 `signing/debug/material/`**（其 debug 下的 material 一直被追踪）。
+  照抄时要**两条都写**，否则 debug material 仍会进仓库。
+- **⚠️ 判定口径**：`git check-ignore <目录>` 对**目录路径**的判定不可靠
+  （目录返回 TRACKED，但其下文件实际已被忽略）；
+  验证一律用 **`git status --porcelain`** + **`git ls-files | grep material`**（权威）。
+- **口诀**：**"签名材料进仓库、material 缓存除外；check-ignore 不可信，用 ls-files 验"**
+
+---
+
+### LSN-030 存 URI 不复制文件 ⇒ **每次启动必须重新 `activatePermission`**（漏掉=重启后静默白屏）
+
+- **风险**：🔴 高危且**极难定位** —— 症状是"**导入当次完全正常，杀进程重开就白屏**"，
+  代码里没有任何报错，画布只剩一层底色；不看日志完全想不到是权限。
+- **场景**：2026-09-29/30 Icey-Reader（本地电子书阅读器）：用户两次报"进入阅读页白屏"。
+  前几轮我一直在怀疑 `canvasW` 尺寸 / 排版口径 / px2vp（都不成立，见 LSN-029 上一条的排查史）。
+  真因是**剪裁模板时漏抄了权限激活**。
+- **机理**（三步锁死）：
+  1. 本地书/音乐**不拷贝进沙箱**（省空间 + 秒导入）⇒ 仓库里存的是导入时的**原始 URI**
+     （`file://docs/storage/.../x.txt`），正文靠 `fileShare` 持久授权**直读原始 URI**。
+  2. `fileShare.persistPermission(policies)` 授予的权限**跨应用重启不会自动生效**，
+     必须**每次启动**对每个 URI 调 `fileShare.activatePermission(policies)`。
+     ⚠️ 「picker 返回的 URI 自带永久授权」**只在本次进程内成立**（LSN-023 旧文曾据此写成"仅作保险"，已修正）。
+  3. 漏掉第 2 步 ⇒ 重启后 `fileIo.openSync(原始URI)` 抛 **13900001 EPERM** ⇒
+     读取函数的 `catch` 只 `AppLogger.error` 就 return（**静默**）⇒ 渲染层拿到空内容 ⇒
+     `drawPageContent(ctx, undefined)` 只填了个底色 ⇒ 用户看到**纯色白屏**。
+- **指纹（怎么一眼认出它）**：
+  | 现象 | 说明 |
+  |---|---|
+  | **导入当次能看，重开就白屏** | ★ 最强指纹：导入时 picker 刚授的权还在 |
+  | 冷启动后所有"历史数据"都打不开 | 但新建的（本次导入的）正常 |
+  | 日志出现 `13900001` / `EPERM` / `PERMISSION_NOT_PERSISTED(4)` | 直接坐实 |
+- **正解（两件事都要做，缺一仍复发）**：
+  ```ts
+  // ① 启动恢复链路里复激活（EntryAbility.startupReady 内，数据仓库 init 之后）
+  await BookRepo.activatePermissions();   // 遍历全部 bookUrl 调 FilePermission.activate(uris)
+
+  // 仓库侧（BookRepo / MediaScanner 同款）
+  static async activatePermissions(): Promise<void> {
+    const uris = BookRepo.books.map(b => b.bookUrl).filter(u => u.length > 0);
+    if (uris.length === 0) return;
+    try { await FilePermission.activate(uris); }        // 内部分批(≤200) + 逐 URI 错误明细
+    catch (e) { AppLogger.error(TAG, `activatePermissions 失败: ${JSON.stringify(e)}`); }
+  }
+  ```
+  ```ts
+  // ② 读取路径再加"单 URI 兜底"（覆盖"本次导入但 persist 失败"/"用户刚移动过文件"）
+  try { await FilePermission.ensureActive(uri); } catch (_) {}   // 内部 activate 失败会 persist+activate 重试
+  ```
+- **参考实现**：`Icey-Player-Harmony/services/MediaScanner.ets:540` 注释即写着
+  「**存原始 URI，重启后通过 activatePermission 恢复访问，不复制文件**」，并在 `:152/:624` 分批激活。
+  本项目模板 `services/FilePermission.ets` 已自带 `persist/activate/ensureActive/waitActivateDone` ——
+  **剪裁模板时"删掉没被引用到的服务"很容易把它连带删掉，务必保留**。
+- **配套原则（本轮一并确立）**：**绝不静默失败**。凡是"内容读到空 ⇒ 界面整片空"的路径
+  （记录缺失 / 目录为空 / **正文 0 字** / 排版 0 页 / 读文件抛异常），都必须落到**可见错误态
+  + 重试入口**，而不是只打日志。这次白屏之所以拖了两轮才定位，根因就是**失败被静默吞掉**。
+- **口诀**：**"存 URI 不复制 ⇒ 每次启动 activate；导入能看重开白 ⇒ 先查 13900001"**
+
+---
+
+### LSN-031 Canvas 自绘正文要支持「长按划选」+ 功能面横向铺开（划选命中 / 手势分流 / 跨页返回）
+
+- **场景**：2026-09-30 Icey-Reader：用户要求「照着 legado 把该做的功能都做了」——
+  阅读页一次性补齐 **书签 / 笔记 / 划选 / 书内搜索 / 阅读统计 / 书架分组 / 排版扩展**。
+  其中**长按划选**是唯一需要"在 Canvas 上做字符命中测试"的能力；其余几个坑都是
+  **一次横铺多个能力**时才暴露的（这类"能力面对齐"任务建议一次做完 + 一次编译，比零敲碎打省事）。
+- **坑① Canvas 自绘文本的字符命中（最容易写错，也最值得一次写对）**：
+  - ❌ 错法：用「局部 `y / 页高`」或「`x / 行宽`」的比例**线性估**字符下标 ——
+    行高、字宽随**字号 / 字距 / 段距**变化，估算**必然错位**（多选一个字、少选一个字、跨行乱选）。
+  - ✅ 正解（**三层收敛**，逐层都用真实数据、不用比例）：
+    1. `localX/px2vp − 页边距` ⇒ 得到**页内容区**坐标
+       （⚠️ 别拿画布原始坐标去比字形坐标，页边距会整体偏移）；
+    2. 按**行**的 y 区间定位到行：`行高 = 字号 × lineSpacing`，且**标题行字号 +2**
+       （标题与正文行高不同；只用正文行高 ⇒ 从标题之后开始**整页错位一整行**）；
+    3. 行内按字形 `x` 找**最后一个「左缘 ≤ cx」**的字形；若已越过该字形**右缘中点**则 +1；
+       章内字符偏移 = `line.charStart + idx`（注意是**章内偏移**，不是页内偏移）。
+  - ★ **关键前提**：排版产物必须**每行都带 `charStart`（章内起始偏移）**。若排版结果只有
+    一个字符串（无偏移表）⇒ 无法映射回章内位置 ⇒ 划选只能拿到"屏幕上一段"，**无法与
+    书签 / 笔记的 `chapterPos` 对齐**。**排版期就把偏移存下来，别在交互期反推。**
+- **坑② 划选必须与翻页手势「同一手势分流」，不要再加一个手势**：
+  阅读页已用 `PanGesture` 做翻页；再挂独立 `PanGesture` / 手势组做划选 ⇒ 两者争抢，
+  出现"想选字结果翻页"。正解 = **复用同一个 Pan，按状态分流**：
+  ```ts
+  .gesture(PanGesture()
+    .onActionStart(e  => { if (this.selecting) this.extendSelect(e); })
+    .onActionUpdate(e => { if (this.selecting) this.extendSelect(e); })          // selecting ⇒ 扩选
+    .onActionEnd(e    => { if (this.selecting) return; this.handlePageSwipe(e); })// 否则 ⇒ 翻页
+  )
+  ```
+  进入划选的入口是**长按**（`LongPressGesture({ repeat: false, duration: 400 })` → `beginSelect`）；
+  退出用页面点击（`selecting` 态下 `exitSelect()` 后 **直接 `return`**，**不要再触发翻页 / 呼出菜单**）。
+- **坑③ 划选底衬要「逐行画」，不能把章内偏移当页面坐标**：
+  选中区间是**章内字符偏移** `[selStart, selEnd)`，而绘制发生在**当前页**坐标系里。
+  正解 = 遍历当前页每一行，求**行与选中区间的交集**，**逐行**铺半透明色块
+  （`ctx.fillRect(行左缘, 行顶, 按交集字符数折算的行宽, 行高)`）；直接拿 `selStart/selEnd`
+  当 x/y 去画会**跑到页外**。色块用 accent 色 **alpha≈0.22** 半透明，叠在文字**之下**。
+- **坑④ 划选浮动条 / 长按菜单「只放文字项」**：浮条 `position({ x: 16, y: 96 })` 固定贴顶，
+  底色 `#E6000000`，项 = 「**笔记 / 复制 / 取消**」**纯文字**（不引图标）；
+  破坏性项（删除笔记）用**红色文字**表达，不靠图标 —— 与本项目一贯 UI 口径一致（§2）。
+- **坑⑤ 从「管理页」返回阅读页：栈里不一定有阅读页**：
+  书签列表 / 搜索结果可能从**书架 → 书籍详情页**直接进入，此时路由栈里**没有阅读页**，
+  一律 `pop()` 会退到**错页**（详情页）而不是阅读页。正解 = 先判存在再决定：
+  ```ts
+  AppRouter.getInstance().has(ROUTE_READER) ? pop() : push(ROUTE_READER, bookUrl);
+  // has(name) = pathStack.getAllPathName().indexOf(name) >= 0
+  ```
+  配套：搜索页与书签页**共用一条跳转信号**（`@StorageLink('readerSearchJump')`），
+  阅读页 `@Watch` 消费后**立即清空信号**（否则同一条会被反复触发）。
+- **配套：功能面横向铺开时的 3 个必查项**（本轮全部踩到）：
+  1. **`$r('sys.symbol.xxx')` 必须先核实存在** —— 符号名写错**不报错、只是渲染空白**（LSN-020）。
+     查 `<DevEco>/sdk/default/openharmony/toolchains/id_defined.json` 里 `"type":"symbol"` 的记录。
+     本轮实测**存在**：`bookmark` / `bookmark_fill` / `bookmark_notepad` / `magnifyingglass` /
+     `timer` / `folder` / `xmark_circle_fill` / `square_and_pencil` / `trash` /
+     `exclamationmark_circle` / `arrow_counterclockwise`；
+     **不存在**：`bookmark_square` / `note_text` / `highlighter` / `chart_bar` / `text_quote` / `pencil`。
+  2. **单文件内同一模块只写一行 import** —— `import { AppRouter }` 与 `import { ROUTE_SEARCH }`
+     各写一行 ⇒ 视同重复声明报错；合并成 `import { AppRouter, ROUTE_SEARCH } from '...'`。
+  3. **新增成员一旦写到 struct 的 `}` 之后，会引发几十条级联假错误**（见坑点速查表）：
+     报 `Property 'xxx' does not exist on type 'Xxx'` + `UI component 'Column' cannot be used in
+     this place` + `Cannot find name 'b'`。**元凶在报错点之外** —— 用脚本扫「独占一行的 `}`」
+     定位那个提前闭合处（本工程实证在 615 行），把成员移回结构体内即可，**别按报错逐条补**。
+- **口诀**：**"划选三层收敛（局部→行→字形），手势同源分流；跨页先问 has，符号先查 id_defined"**
+
+---
+
 ## 7. 自查清单
 
 ### 动手前（每次改动）
@@ -1212,6 +1373,7 @@ HarmonyAppTemplate/
 | **D8** | 编译失败：`10905201 The 'Blank' component can only be nested in the 'Row,Column,Flex' parent component` | 模板各页 `ListItem() { Blank().height(...) }`（`HomeTab` / `SettingsTab` / `AboutPage` 的顶部与尾部留白） | 换成空 `Row` 占位：`ListItem() { Row() {}.height(SafeArea.top + 64).width('100%') }`（空容器写法与 `AppSheet` 里 `Stack() {}.width(1).height(1)` 同源） |
 | **D9** | 静默失效：背景图变化时子页不重新淡入 / 弹窗退后台不自动关 | `SubPageScaffold.ets` 的 `@StorageLink('settings_customBgUri') @Watch(...)`、`AppSheet.ets` 的 `@StorageLink('appBackgrounded') @Watch(...)` 与 `@StorageLink('sheetReopen') @Watch(...)` —— **@Watch 写在状态装饰器之后** | 按 LSN-012 调换顺序：`@Watch('cb') @StorageLink('k') x`。模板自身就踩了这条，抄代码时务必一并改 |
 | **D10** | **运行时**（编译通过、最容易漏）：启动恢复够快时列表页永久停在「加载中…」 | ① `App.ets` 的 `aboutToAppear` **无条件** `AppStorage.setOrCreate('dataLoaded', false)`；② `EntryAbility.ets` 的恢复链路用 `AppStorage.set('dataLoaded', true)`（键不存在时静默落空） | 两侧都改，缺一不可：① App 侧改为**仅在键不存在时**初始化；② EntryAbility 侧改用 `setOrCreate`。详见 **LSN-018** |
+| **D11** | 观感问题（不报错、真机才看得出）：**弹窗卡片底边贴住手势条被压 / 横屏时左右被挖孔压** —— 用户表述为「弹窗的卡片边距不大对」 | 弹窗容器（如 `SheetContainer`）的卡片边距写成**死值** `margin({left:24,right:24,bottom:24})`，而页面内容普遍有 `SafeArea.bottom + 80` 尾部留白 ⇒ **弹窗卡片是全局唯一漏掉安全区的边距** | 卡片边距改为 **`24 + SafeArea.*`**（左右 + 上下底部），顶部保持 24（bindSheet 不在屏幕顶，加顶部安全区会把内容整体下推）。**连带两处必须同步**：① 标题行的横向 padding（与卡片左右缘对齐）；② 卡片外底栏的左右 padding（否则横屏与卡片错位）。`cardMaxHeight()` 的净空扣除本就含安全区，不用改。**这是 LSN-014「横向内缩只由卡片自身提供」的同族坑**：边距语义只在容器一处定义时，务必连安全区一起定义 |
 
 > ⚠️ **结论：内置副本「原样复制 + 只修 D1~D4」仍然编不过。**
 > v1.1.5 实测：完整跑通一次 `assembleHap` 至少需要修 **D1、D2、D5、D6、D7、D8**（6 项）。
@@ -1252,6 +1414,9 @@ HarmonyAppTemplate/
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| **v1.3.9** | 2026-09-30 | 新增 **LSN-031**（**Canvas 自绘正文「长按划选」+ 功能面横向铺开**）。来源：Icey-Reader 用户要求「照着 legado 把该做的功能都做了」——阅读页**一轮补齐** 书签 / 笔记 / 划选 / 书内搜索 / 阅读统计 / 书架分组 / 排版扩展，全部**用鸿蒙特性（沉浸光感 / 符号 / 系统组件）**实现。核心坑五条：<br>① **Canvas 字符命中**（最易写错）：**禁比例估下标**，走**三层收敛** —— `localX/px2vp − 页边距` ⇒ 页内容区；按行 y 区间定位行（`行高 = 字号 × lineSpacing`，**标题行字号 +2**）；行内找**最后一个左缘 ≤ cx** 的字形、过其右缘中点 +1 ⇒ 章内偏移 `line.charStart + idx`。★ **排版期必须存每行 `charStart`**，交互期无法反推。<br>② **划选与翻页同一手势分流**：复用既有 `PanGesture`（`selecting` 态改作 `extendSelect`，否则翻页），❌ 不要新增第二个 Pan / 手势组（会争抢成"想选字却翻页"）；进入划选用 `LongPressGesture({repeat:false,duration:400})`，退出后**直接 return 不再触发翻页**。<br>③ **划选底衬逐行画**：选中区间是**章内偏移**、绘制在**当前页**坐标系 ⇒ 求行 ∩ 区间的交集后逐行 `fillRect`（accent alpha≈0.22，叠在文字之下）；直接拿 `selStart/selEnd` 当 x/y 会跑到页外。<br>④ **跨页返回先问 `has`**：管理页可能从**书架→详情页**进入，栈里没有阅读页 ⇒ 一律 `pop()` 退到错页；正解 `AppRouter.has(ROUTE_READER) ? pop() : push(ROUTE_READER, bookUrl)`。多个入口**共用一条 `@StorageLink` 信号**，`@Watch` 消费后**立即清空**。<br>⑤ **功能面横铺三必查**：`$r('sys.symbol.xxx')` 先核 `id_defined.json`（写错**不报错只渲染空白**，本轮实测存在 `bookmark`/`bookmark_fill`/`bookmark_notepad`/`magnifyingglass`/`timer`/`folder`/`trash` 等，**不存在** `bookmark_square`/`note_text`/`highlighter`/`chart_bar`/`text_quote`/`pencil`）；单文件同模块**只写一行 import**（拆两行视同重复声明）；**新成员写到 struct 的 `}` 之后会引发几十条级联假错误**（`Property 'xxx' does not exist` + `UI component 'Column' cannot be used in this place`），元凶在报错点之外 ⇒ 扫「独占一行的 `}`」定位提前闭合处（实证 615 行），**别逐条改**。<br>坑点速查表 +3 行。附：划选浮动条/长按菜单**只放文字项**、破坏性红色（§2 UI 口径） |
+| **v1.3.8** | 2026-09-30 | 新增 **LSN-030**（**存 URI 不复制文件 ⇒ 每次启动必须重新 `activatePermission`**）+ **修正 LSN-023 的误导性表述**。🔴 极难定位，症状 = 「**导入当次完全正常、杀进程重开就白屏**」，代码零报错、画布只剩一层底色。机理：① 本地书/音乐不拷进沙箱 ⇒ 仓库存**原始 URI**，靠 fileShare 持久授权直读；② `persistPermission` **跨重启不自动生效**，必须每次启动逐 URI `activatePermission`（LSN-023 旧文「picker URI 自带永久授权、persist/activate 仅作保险」**只在本次进程内成立**，已就地改正）；③ 漏掉 ⇒ `openSync` 抛 `13900001 EPERM` ⇒ catch 静默 return ⇒ 渲染层拿空内容 ⇒ 纯色白屏。<br>**正解（双保险）**：启动链路（`EntryAbility.startupReady`，数据仓库 init **之后**）`await BookRepo.activatePermissions()` + 读取路径 `FilePermission.ensureActive(uri)`。参考实现 `Icey-Player-Harmony/services/MediaScanner.ets:540`（注释原文「存原始 URI，重启后通过 activatePermission 恢复访问，不复制文件」，`:152/:624` 分批激活）。⚠️ 剪裁模板时「删掉没被引用的服务」极易把 `services/FilePermission.ets` 连带删掉，**务必保留**。<br>**配套确立「绝不静默失败」**：凡「内容读到空 ⇒ 界面整片空」的路径（记录缺失 / 目录为空 / **正文 0 字** / 排版 0 页 / 读文件抛异常）都必须落到 `@State loadError` + **可见错误态 + 重试入口**。这次白屏拖了两轮才定位，根因就是失败被静默吞掉。<br>坑点速查表 +2 行。来源：Icey-Reader 阅读器两次报白屏，前几轮误判在 canvas 尺寸 / 排版口径 / px2vp，真因是剪裁模板时漏抄权限激活 |
+| **v1.3.7** | 2026-09-29 | 新增 **LSN-029**（`.gitignore` 签名约定）+ **修正内置模板** `assets/template/.gitignore`：其第 13 行原为**裸 `signing/`** ⇒ 整个签名目录被忽略，仓库里没有 p7b/cer/p12/csr，`git status` 里也永远看不见（极易漏提交）。后果 = 新机器 clone 后构建不出可安装包（`unsigned.hap` / 安装报 `9568320 no signature file`），签名类问题（`00303074`）无法复现。<br>**定案规则**：签名材料**必须进仓库**，只忽略 `/signing/material/` 与 `/signing/debug/material/`（hap-sign-tool 哈希命名中间缓存，可重建）。⚠️ 两条都要写 —— 参考项目（Icey-Player-Harmony）只写了 `/signing/material/`，漏掉 `signing/debug/material/`。⚠️ 验证口径：`git check-ignore <目录>` 对目录判定**不可靠**，一律用 `git status --porcelain` + `git ls-files \| grep material`。<br>坑点速查表 +1 行。来源：Icey-Reader 照抄模板导致签名被整体忽略，用户复核 commit 时纠正「不用 ignore 签名 / material 是要忽略的」 |
 | **v1.3.6** | 2026-09-18 | 扩充 **LSN-025**（实色大卡改多卡光感），补两条"改版后才暴露"的规则：<br>① **只读内容块（备注 / 说明正文）同样要"承载"**：玻璃卡面上直接铺一段正文，深浅两色下都可能不够清晰 ⇒ 应套一层与输入框**同款容器**（`surface` 底 + `borderRadius 12` + `0.5vp colors.fieldBorder` 发丝描边）。附带好处："同一份内容在表单页是 `TextArea`、在详情页是同款承载"，视觉语言一致、切换无割裂。<br>② **详情 / 只读页的字段为空时不要整块隐藏**：`if (hasNote) { 备注卡 }` ⇒ 用户**分不清"没填"还是"不支持"**。本工程实证：详情页备注卡原为"无备注不渲染"，用户随即报「详情页要能显示备注」。正解 = 字段卡**常驻** + 空值占位文案（「暂无备注」）——"这一栏存在"本身要被表达出来。⚠️ 与表单/编辑页**相反**：表单页空字段不渲染更清爽，因为没有"这一栏存在与否"的疑问。<br>坑点速查表 +1 行（只读页空字段） |
 | **v1.3.5** | 2026-09-18 | 新增 **LSN-028**（**同一组件「点击 + 长按」+ 详情页自动刷新**）。三个坑都**编译全绿、仅真机暴露**：<br>① **`.onClick` 与 `.gesture(LongPressGesture)` 并存 ⇒ 双跳**：长按命中后抬手又触发点击 ⇒ 路由栈连进两页（用户看到"长按后莫名跳转"）。正解 = **互斥手势组** `GestureGroup(GestureMode.Exclusive, LongPressGesture({duration:500}).onAction(...), TapGesture({count:1}).onAction(...))`（独占模式"先满足条件者胜出"）；❌ 不要 `GestureMode.Parallel`（两个都触发）、❌ 不要叠两个 `.gesture()`。<br>② **子页"外部数据变更后不刷新"**：把重算结果放**普通字段缓存**、在 `build()` 里读 ⇒ 刷新链尾段变成"父组件重渲染**会不会顺带重跑 `@Builder`**"这一**不确定行为**；症状 = 编辑保存返回仍是旧值、**退出重进才对**（极易被误判为"没问题"）。正解 = **`@State` 持有视图模型 + `@Watch` 驱动重算**（`@Watch` 必须写在状态装饰器**之前**，LSN-012），并**入参只取 id、不持有快照**（页面永远 `repo.find(id)`；返回 `null` ⇒ 渲染「记录不存在」兜底卡，**不要在 build 里 pop**）。视图模型可以是页面内私有 class（同 `SegmentsParams` 范式），但**不许复算业务**（口径仍归 model，LSN-015）。<br>③ **`ForEach` 的 key 只写"身份"不写"值"** ⇒ "项还在、值变了"（如明细行的"已使用 / 目标成本 / 已存金额"）**key 不变 ⇒ 复用既有节点、不重跑 `@Builder`** ⇒ 永远停在旧值，是三者中最隐蔽的。正解 = key 带上会变的值（`kv_${label}_${value}_${accent}_${isLast}`）；列表页 key 再带 `_${this.assetsVersion}` 作双保险。<br>坑点速查表 +3 行（点击+长按 / 子页刷新 / ForEach key）。来源：AssetDailyCost「卡片改为长按编辑」后紧接着「点击卡片可以查看详情」，一轮内三坑齐现 |
 | **v1.3.4** | 2026-09-18 | 新增 **LSN-027**（**长按手势**）：把「点击」改成「长按」时，`Stack` / `Column` 等容器**没有 `.onLongPress` 修饰符**——写 `.onLongPress(() => {...})` 报 `10505001 Property 'onLongPress' does not exist on type 'StackAttribute'`（换 `Column` 报 `'ColumnAttribute'`）。正确写法 = **`LongPressGesture` 描述符 + 容器根节点 `.gesture(LongPressGesture({ duration: 500 }).onAction(() => {...}))`**。⚠️ 连环坑：`LongPressGesture` 是 ArkUI **全局声明、无需 import**，试图 `import { LongPressGesture } from '@kit.ArkUI'` 会报 `10311006 'LongPressGesture' is not exported from Kit '@kit.ArkUI'`。含：挂载点选择（根容器；`hitTestBehavior(HitTestMode.None)` + `enabled(false)` 的材质承载层不拦截手势）、`.gesture()` 默认 `GesturePriority.Normal` 与宿主 `List` 滚动手势共存的原理（"按住不动"与"位移"判定互斥）、`repeat: true` 适用场景。并给出**「点击改长按」口径变更规范**：`.onClick` 整段替换为 `.gesture(...)`、回调属性**同步改名**（`onCardTap` → `onLongPress`）让调用点漏改即编译失败、复用组件把回调做成**带默认空实现的可选属性**（不传零副作用）。坑点速查表 +1 行（素材来源：AssetDailyCost 列表卡改长按编辑，连报两种编译错误后定稿） |
@@ -1276,4 +1441,4 @@ HarmonyAppTemplate/
 
 ---
 
-*鸿蒙 App 模板基建 v1.3.3 | 内置模板，换机即用 | 读模板 → 按工作流剪裁 → 按铁律改代码 | 改前先看 §2，改后先过 §7，新建工程先扫附录 C*
+*鸿蒙 App 模板基建 v1.3.9 | 内置模板，换机即用 | 读模板 → 按工作流剪裁 → 按铁律改代码 | 改前先看 §2，改后先过 §7，新建工程先扫附录 C*

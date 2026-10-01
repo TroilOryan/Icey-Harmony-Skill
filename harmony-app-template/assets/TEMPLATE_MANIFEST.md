@@ -7,7 +7,9 @@
 
 ```
 assets/template/
-├── .gitignore                      # 已排除 node_modules/oh_modules/build/.hvigor/.idea 等
+├── .gitignore                      # 排除 node_modules/oh_modules/build/.hvigor/.idea 等；
+│                                   # ⚠️ 签名目录**只忽略 material/ 缓存**（/signing/material/ +
+│                                   #    /signing/debug/material/），p7b/cer/p12/csr 必须进仓库（LSN-029）
 ├── README.md                       # 模板自身文档（铁律原文 122 条，SKILL.md 是其纲要）
 ├── build-profile.json5             # targetSdk 26 / compatibleSdkVersion 6.1.0(23)
 ├── hvigorfile.ts

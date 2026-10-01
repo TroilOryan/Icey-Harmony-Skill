@@ -10,4 +10,11 @@
 /.clang-tidy
 **/.test
 /.appanalyzer
-signing/
+
+# ===== 签名文件：**不忽略，随仓库版本化**（务必不要写成 `signing/`）=====
+# p7b / cer / p12 / csr 是"工程可复现构建"的一部分，必须进仓库；
+# 整体忽略会导致新机器 clone 后编译不出可安装包、也无法复现签名问题（00303074）。
+#
+# 例外：material/ 是 hap-sign-tool 生成的哈希命名中间缓存，每次构建可重建，不版本化。
+/signing/material/
+/signing/debug/material/
