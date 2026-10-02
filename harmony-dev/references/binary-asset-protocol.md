@@ -26,7 +26,7 @@ cp entry/src/main/resources/rawfile/stars.bin .workbuddy/cache/stars.orig.bin
 ### 1. 只读体检
 
 ```bash
-node scripts/bin-table-audit.mjs <表文件> <每元素 float 数> <索引文件...> <meta.json>
+node ../scripts/bin-table-audit.mjs <表文件> <每元素 float 数> <索引文件...> <meta.json>
 ```
 
 看四块输出：

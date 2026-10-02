@@ -1,88 +1,18 @@
 ---
 name: harmony-screenshot-layer-forensics
-description: 用真机截图判定「某个图层/标签到底画没画出来」，把「看不到 X」拆成「没画」还是「不在视野/被挡」。适用于 HarmonyOS/ArkUI 这类 XComponent(GPU 表面) + Canvas 叠加层混合渲染、或任何全屏自绘 App 的视觉投诉定位：按元素特征色做掩膜→连通块聚类（判类别）→高对比放大读字（判内容），并先从截图里的 chrome 特征确认截图归属端。触发词：看不到标签/文字/图层没出来、截图里没有 XX、截图取证、layer forensics、why is X missing。
+description: >
+  【已合并，占位跳转壳】原独立技能 `harmony-screenshot-layer-forensics` 已并入入口技能 `harmony-dev`，
+  内容在 `harmony-dev/references/harmony-screenshot-layer-forensics.md`。本壳不含触发词；命中原触发场景时请加载 `harmony-dev`。
 agent_created: true
+version: 9.0.0-merged
 ---
 
-# 真机截图分层取证（"看不到 X" 的判据）
+# （已合并）harmony-screenshot-layer-forensics
 
-## 何时用
+本技能已于 **2026-10-03** 合并进入口技能 **`harmony-dev`**（为鸿蒙开发赋能）。
 
-- 用户说「看不到某个标签/元素/图层」，而你在代码里找不出问题。
-- 混合渲染：GPU 表面（XComponent / Surface）上叠 ArkUI Canvas 或原生浮层 —— 需要先判**叠加层在不在画**。
-- 需要把「代码没跑」和「跑了但视向/视锥里没有该对象」区分开。
+- 用途：真机截图判定「图层/标签到底画没画出来」
+- 完整内容：**`harmony-dev/references/harmony-screenshot-layer-forensics.md`**
+- 入口与任务路由表：**`harmony-dev/SKILL.md`**
 
-## 铁律 0：先确认截图归属，再作结论
-
-同一台设备上「我们的 App」和「参考 App」截图极易混。别靠 HUD 数字认（数字可能巧合相同），
-靠**结构特征**认（这些只在其中一端存在）：
-
-| 判据 | 我们端特征 |
-|---|---|
-| 底栏 tab 文案 | 项目自己的 `tabTitles`（去源码 grep 确认） |
-| 悬浮按钮文案/位置 | 项目自己的 FAB（如「复位」pill） |
-| 读数格式 | 项目 `readout*()` 拼出来的精确格式（含分隔符、空格） |
-| **同屏出现的名称体系** | 上游任一天空文化只会出**一套**名字；同屏出现两套 ⇒ 只可能是本项目标签层 |
-
-❌ 反面教训（本项目真实踩坑）：把「我们自己的截图」当成参考 App 的截图，
-基于它量出的视场/投影结论会**自证循环**；而俯视天底的截图量"方位跨度"必然接近 180°+，
-是几何假象，不是宽视场证据。**量视场必须用朝向地平线/斜视的图**。
-
-## 判据 1：叠加层是否在画（颜色掩膜 + 连通块）
-
-标签是叠在复杂背景（草地/星空/照片）上的细笔画文字，颜色刻意与背景拉开：
-
-```python
-# 草地背景 R≈G≫B；青系文字 B−R>26；白/暖白文字 R,G,B 都高且彼此接近
-cyan    = (b - r) > 26 and b > 70
-neutral = r > 150 and g > 150 and b > 140 and abs(r - b) < 46
-```
-
-膨胀 3px → 4 邻域连通块 → 过滤「细长横条」(`宽≥24px`、`高≤46px`、`宽高比≥1.6`)。
-**只要能聚出块 ⇒ 该图层在画**，哪怕肉眼在原始缩放里看不见。
-同时按平均色分类（青/暖白/白），直接对应到代码里的哪一类标签常量。
-
-⚠️ 阈值太紧会漏掉**低 alpha 的暗标签**（本项目实测：`dim=0.72` 的地平下标签 + 草地背景
-⇒ 连通块检测不到，但把亮度抬 3 倍后肉眼可读）。所以：**先跑检测，再跑高对比放大肉眼读**，两条路都要走。
-
-## 判据 2：内容是什么（对比增强 + 定点放大）
-
-```python
-flat = ImageOps.autocontrast(im, cutoff=1)
-flat = ImageEnhance.Contrast(flat).enhance(2.6)
-flat = ImageEnhance.Brightness(flat).enhance(1.35)   # 暗标签(alpha≈0.4~0.7)必须抬亮
-crop.resize((crop.width * 7, crop.height * 7), Image.LANCZOS)   # 7x 左右才读得出汉字
-```
-分块（2×3，8% 重叠）看整体构图；定点小窗放大读具体文字。中文字号 ~30px 时 7x 才可靠。
-
-## 判据 3：「不在视野」的离线复算（而不是靠猜）
-
-拿到截图 HUD 里的**视向（方位/高度）+ 视场 + 站点**，用出货源码离线复算该视向下
-每个目标是否落在投影视锥内。要点：**直接 import 出货源码副本**（ArkTS `.ets` 拷成 `.ts`、
-剥掉 import/enum 后 node 直跑），不要另写一份公式，否则"脚本对了 App 里是另一套"。
-
-```
-node probe-xxx.mjs "2026-09-22T11:02:41+08:00" <lon> <lat>
-```
-扫 `az 0..360 step 5` × `alt -30..80 step 5`，输出「最多能同屏 N 个目标 @ 视向 az/alt」
-+ 每个目标 `alt/az` + 屏幕坐标 ⇒ 直接给出**可让用户复现的具体朝向**。
-
-本项目已知的剔除口径（决定"看不到"是否合理）：
-- 行星：`hz.alt <= -3` 剔除（配合 GPU 侧 alpha=(alt+3)/3 同口径），再过投影视锥；
-- 星座/亮星/星官：地平下**不剔除**只压暗（dim 0.72），所以俯视地面时会看到"标签浮在草地/地面上"；
-- 标签优先级 = 收集顺序（行星 → 星官 → 亮星 → 星座），行星永远先入队 ⇒
-  **只要某行星在视锥内，它的标签必定通过重叠剔除**（重叠剔除只跟已通过的比）。
-
-## 本机执行坑（Windows）
-
-- PowerShell 工具**不回显 stdout**：一律 `*> $file` 再 Read。
-- `*> / Out-File / Add-Content` 写出的文本 Read 常判 binary（UTF-16/BOM）⇒
-  产出文本**用 Python 以 `\n` + UTF-8 写**（见 `append-note.py` 用法）。
-- `bash` 缺 coreutils（`ls/head/grep` 全无）⇒ 用 Glob/Grep/Read 专用工具 + PowerShell。
-- 批量改文件时**不要并行 Edit 同一个文件**：会静默只落一部分（每个都回 success），
-  改完用 Python 数字节/关键字复核。
-
-## 输出物
-
-一张**标注图**（原截图 + 红圈 + 一句话结论）+ 一份「可复现朝向」的数字结论。
-用户要的是"我该对着哪儿看/我该量什么"，不是你的推理过程。
+> 请改读上述分册；本目录仅为兼容旧引用而保留。

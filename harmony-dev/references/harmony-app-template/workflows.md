@@ -29,7 +29,7 @@ cd <新工程根>
 
 > 💡 内置副本已排除 10MB 的可选图标字体（`rawfile/fonts/sficons_harmony.ttf`）——
 > SFIcon 走 SVG 渲染，模板代码对它零引用，不影响构建。需要时从原工程拷回即可。
-> 完整清单见 `assets/TEMPLATE_MANIFEST.md`。
+> 完整清单见 `../../assets/TEMPLATE_MANIFEST.md`。
 
 `AppScope/app.json5`：
 
