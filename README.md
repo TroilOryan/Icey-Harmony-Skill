@@ -14,7 +14,7 @@ Get-ChildItem -Directory | Where-Object { $_.Name -notmatch '^\.' } |
   ForEach-Object { Copy-Item $_.FullName "$env:USERPROFILE\.workbuddy\skills\" -Recurse -Force }
 ```
 
-## 技能索引（15 个）
+## 技能索引（18 个）
 
 ### 基建 / 脚手架
 
@@ -35,12 +35,15 @@ Get-ChildItem -Directory | Where-Object { $_.Name -notmatch '^\.' } |
 
 | 技能 | 用途 |
 | --- | --- |
-| `harmony-material-layer` | 沉浸光感完整落地方案：两套枚举口径、官方默认档表、四种 scope、封面色调材质、**挡位实时生效三件套**（@StorageLink / ForEach key 重建 / builder 传参） |
-| `harmony-titlebar-menu` | 标题栏按钮弹出下拉菜单（Hds menu icon + `PromptAction.openMenu`），含 `bindMenu` 第二参 `placement`/`systemMaterial` 必传坑 |
+| `harmony-material-layer` | 沉浸光感完整落地方案：两套枚举口径、官方默认档表、四种 scope、封面色调材质、**挡位实时生效三件套**（@StorageLink / ForEach key 重建 / builder 传参）、**Toggle 承载层完整性五条属性** |
+| `harmony-sheet-panel` | 半模态弹窗（`bindSheet`）**自绘标题带 + 边缘渐变模糊**完整范式：弃用 `SheetOptions.title`、`linearGradientBlur` 半径单位是 px、模糊档位与底色档位必须同组、内容必须真能滚进标题带、宽屏判定按窗口短边、**自绘返回按钮 = 圆形 + 光感且整行下沉与关闭按钮同心**、同页多弹窗蒙层叠压/首建掉帧收敛 |
+| `harmony-titlebar-menu` | 标题栏按钮弹出下拉菜单（Hds menu icon + `PromptAction.openMenu`），含 `bindMenu` 第二参 `placement`/`systemMaterial` 必传坑、**菜单一律无分割线**（`MenuItem.divider` 不设置即不画） |
 | `harmony-side-drawer` | 手机端自研侧滑抽屉：`SheetType.SIDE` 不生效、跟手黏手、**全屏覆盖层阻塞命中测试**（页面点不动/列表滚不动） |
 | `harmony-system-loading` | 首屏与加载态一律用系统 `LoadingProgress`，**禁自绘加载动画**（用户定案） |
 | `harmony-symbol-outline-to-pixelmap` | 把系统符号（`sys.symbol.*`）画进 PixelMap / 离线位图（播控封面、通知图标、服务卡片、分享图） |
 | `harmony-form-card` | 桌面服务卡片（Form Kit）：数据注入、卡片点按路由（FormLink）、独立进程读不到 AppStorage 等 |
+| `harmonyos-arkts-custom-background` | 自定义背景（壁纸）：深浅色双槽位、模糊度滑块、选图落沙箱存 `file://`（**禁 base64**）、壁纸透出的半透明背景、**重启后壁纸消失** |
+| `harmonyos-arkts-form-card` | 桌面卡片另一角度：三件套齐全、`form_config.json`、静态卡片、`updateForm` 不刷新排查 |
 
 ### 能力接入 / 专项
 

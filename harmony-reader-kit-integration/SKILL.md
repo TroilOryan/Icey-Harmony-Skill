@@ -25,7 +25,30 @@ agent_created: true
 - `main_pages.json` 的 `src` 里注册一个外壳页，如 `pages/subPages/ReaderKitHost`
 - 外壳页里读 `this.getUIContext().getRouter().getParams()` 取参 → 回填到应用的「最近一次参数」容器
   （复用内部已有的 `AppRouter.getLastParam()` 口径，子组件一行都不用改）
-- 入口用 `router.pushUrl({ url, params })`，并用 `pageTransition({ duration: 0 })` 避免多余转场
+- 入口用 `router.pushUrl({ url, params })`
+- ⚠️ **外壳页必须显式写 `pageTransition()`，否则走系统默认转场** —— 默认转场含
+  **不可控的整页位移 + 淡入**（官方明文「时长与物理曲线参数有关、不同设备不同」），
+  观感就是「进入阅读页时内容/自绘标题栏往上移一段」。**这是路由页形态独有的坑**：
+  它不在 `NavPathStack` 上，所以 `SubPageScaffold` 那套 `HdsNavDestination.customTransition`
+  **完全盖不到它**（`customTransition` 只对 NavDestination 生效）。
+  - 正确写法（`pageTransition` 是自定义组件的**成员方法**，无参数；`common.d.ts` 的 `onBackPress` 隔壁）：
+    ```ts
+    pageTransition() {
+      PageTransitionEnter({ type: RouteType.Push, duration: 300, curve: Curve.Friction })
+        .translate({ x: '30%', y: 0 })
+      PageTransitionEnter({ type: RouteType.Pop, duration: 300, curve: Curve.Friction })
+        .translate({ x: '-30%', y: 0 })
+      PageTransitionExit({ type: RouteType.Push, duration: 300, curve: Curve.Friction })
+        .translate({ x: '-20%', y: 0 })
+      PageTransitionExit({ type: RouteType.Pop, duration: 300, curve: Curve.Friction })
+        .translate({ x: '20%', y: 0 })
+    }
+    ```
+  - ❌ **不要写 `pageTransition({ duration: 0 })`**：该成员方法**不接受参数**
+    （声明为 `pageTransition?(): void`），传对象是无效写法。
+  - ❌ **不要叠淡入**：整页淡入会让页面与底层背景混色，读作「背景色渐变过去」
+    （`Icey-Player-Harmony/DetailScaffold` 2026-09-22 同因去掉淡入）。只保留横向滑入。
+  - `SubPageRouterHost`（阅读页之上的子页外壳）**同样要写**，否则进书内搜索/书签页也会位移。
 - 应用内部的 `NavPathStack`（HdsNavigation）**不要**参与阅读页 —— 阅读页不在这个栈上
 
 **连带后果（必须一起处理）**：阅读页是路由页 → 它把应用主页面**完全盖住**。
@@ -208,6 +231,31 @@ getResourceContent / getDomPosByCatalogHref / getAbsoluteResourcePath`。
   在 Kit 内核下也只能靠目录索引 + `pageOffset`
 - 不要设计依赖「坐标↔字符」的功能，SDK 给不了
 
+### ⚠️ 章节进度条：坐标量纲必须全用 `spine` 序，绝不能用目录序（2026-10-01 实证）
+`PageDataInfo.resourceIndex` 是 **spine 序**，而书内**目录项**是另一套坐标（`getCatalogList`）——
+**两者数量不等**（目录可含嵌套/卷/锚点项，也可能缺项）。混用会得到「**滑了没反应**」：
+
+| 参数 | 错误写法 | 后果 |
+|---|---|---|
+| `Slider.value` | `resourceIndex`（spine 序） | — |
+| `Slider.max` | `catalog.length`（**目录项数**） | 两套坐标错位 |
+| `onSeek` 回调 | 拿返回值去目录里**反查** | 目录缺项时反查落空 → 静默无操作 |
+
+正解：**统一到 spine 序** —— `max = getSpineList().length - 1`，
+`onSeek(spine)` 直接按 spine 跳（不经目录）。
+（`getSpineList()` 是 SDK 原生 API，`spineCount()` 只是它的 `.length` 包装。）
+
+### ⚠️ 菜单/工具栏进出场动画：`TransitionEffect` 不需要 `animateTo`（2026-10-01 查 SDK 声明定论）
+社区与 FAQ 常说「`transition` 必须配合 `animateTo`」——**那只对 `TransitionOptions` 类型成立**
+（旧 API，已 `@deprecated since 10`）。`common.d.ts` 原文：*"When set to a value of the
+**TransitionOptions** type, the **transition** attribute must work with animateTo"*。
+而 `TransitionEffect` 自带完整动画参数（`TransitionEffect.opacity(0).combine(...)
+.animation({ duration, curve })`），**直接条件渲染即可生效**。
+⇒ 别为了「让 transition 生效」去套 `animateTo`（会破坏「纯属性动画不与 animateTo 同用」的项目铁律）。
+
+`bindSheet` 承载面板自带系统升降/蒙层渐隐动画 —— 手写 overlay（`backgroundColor('#40000000')`
++ `justifyContent(FlexAlign.End)`）是纯条件渲染，**出现/消失只有一帧硬切**，没有任何过场。
+
 ---
 
 ## 9. 排查顺序（照这个走，别跳）
@@ -224,5 +272,9 @@ getResourceContent / getDomPosByCatalogHref / getAbsoluteResourcePath`。
 8. **面板点不动（点目录不跳章）？** → 开面板前有没有先收菜单（第 5 节）
 9. **阅读页工具栏/标题栏想用 Hds 组件？** → 用不了：Hds 标题栏只能挂 `HdsNavigation` /
    `HdsNavDestination`，而阅读页必须是 `@Entry` 路由页（套 Navigation 就白屏）。
+10. **进入阅读页/其子页时内容「往上移一段」？** → 外壳页漏写 `pageTransition()`（第 1 节）。
+    ⚠️ 路由页的转场**不归 `HdsNavDestination.customTransition` 管**，两条机制互不影响，
+    改了一条另一条照样位移。凡是 `router.pushUrl` 进的 `@Entry` 页都要自己写。
+11. **进度条拖了不跳章？** → 量纲混用（第 8 节），检查 `max` 传的是不是目录项数。
    只能**自绘 Hds 同款**（标题栏 + 悬浮工具条），前景/背景色必须跟随 `ReadConfig.isNight`
    而非应用主题，否则浅底正文上是白字白底 = 隐形。

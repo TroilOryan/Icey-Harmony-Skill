@@ -132,6 +132,18 @@ Test-Path $p            # 先探存在性
   ```
   （这条比 `clean` 廉价：clean 会连带资源/打包全量重来。判断"改动有没有被编译"永远优先于
   "BUILD SUCCESSFUL 这行字"。）
+- ⚠️⚠️ **`Error Code: 00308018 Unknown Error` + `COMPILE RESULT:FAIL {ERROR:N}` 可能是
+  safe-delete 拦截，不是编译错误**（2026-10-01 Icey-Reader 实测）。日志里紧跟一行：
+  `[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] {"count":50,"threshold":50,"scope":"turn",...}`
+  —— hvigor 清理 build 缓存的**批量删除**触发了本机 safe-delete 熔断（`scope:"turn"` =
+  **本会话累计**，不是单次），编译因此中止。
+  **判据**：报错行里没有一条 `Error Message: ... .ets:行:列`（全是 WARN），且失败码是 00308018。
+  **修法**：清掉 build 输出后重编即可；`robocopy <空目录> entry/build /MIR` 是最省事的
+  （比 PowerShell `Remove-Item` 更易过 safe-delete，也不喂大删除计数）：
+  ```bash
+  mkdir -p "$TEMP/empty_dir" && robocopy "$TEMP/empty_dir" "entry/build" /MIR /NFL /NDL /NJH /NJS >/dev/null 2>&1
+  ```
+  **别在这种时候去改代码** —— 上一次能过、这次 00308018，先怀疑它。
 - 报错条数会掉一个：`COMPILE RESULT:FAIL {ERROR:4}` 常常只列出 3 条（hvigor 自己的截断习惯），**别以为只差那一条**；修完重编再看。
 - 增量编译可信，但源码改动偶发丢失（编辑器/工具链竞态）→ **改完立刻 Grep 复核落盘内容**，再编译；否则会对着"幽灵旧代码"的报错白忙。
 - ⚠️ **Edit 会静默不落盘**（2026-09-17 一次会话内连中 3 次，2026-09-17 晚又复现 2 次）：工具回

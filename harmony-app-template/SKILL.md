@@ -10,9 +10,11 @@ description: >
   主题/深浅色/暗色模式/自定义背景/毛玻璃/GlassCard；
   安全区/状态栏/全屏/挖孔/SafeArea/标题栏；
   图标/SFIcon/加个图标、运行日志/AppLogger/更新日志；
+  点不动/点击没反应/看得见点不动/阅读页无法操作/无法翻页/命中失灵；
+  正在排版/一直加载中/无限 loading/卡在加载；一镜到底/共享元素/hero/转场插层；
   hvigor 报错/safe-delete/编译不过/改了没生效
-version: 1.3.9
-changelog: "v1.3.9: 新增 **LSN-031**（**Canvas 自绘正文「长按划选」+ 功能面横向铺开**）——来源：Icey-Reader 用户要求「照着 legado 把该做的功能都做了」，阅读页一轮补齐书签/笔记/划选/书内搜索/阅读统计/书架分组/排版扩展，全部用鸿蒙特性（沉浸光感/符号/系统组件）。五条坑：① **Canvas 字符命中禁比例估下标**，走三层收敛 = `localX/px2vp − 页边距` ⇒ 页内容区；按行 y 区间定位行（`行高 = 字号 × lineSpacing`，**标题行字号 +2**）；行内找「最后一个左缘 ≤ cx」的字形、过右缘中点 +1 ⇒ 章内偏移 `line.charStart + idx`；★ **排版期必须存每行 charStart**，交互期无法反推。② **划选与翻页同一手势分流**：复用既有 PanGesture（selecting 态改作 extendSelect，否则翻页），❌ 不要新增第二个 Pan；进入划选用 LongPressGesture({repeat:false,duration:400})，退出后直接 return 不再触发翻页。③ **划选底衬逐行画**：选中区间是章内偏移、绘制在当前页坐标系 ⇒ 求行∩区间交集后逐行 fillRect（accent alpha≈0.22，叠在文字之下）；直接拿 selStart/selEnd 当 x/y 会跑到页外。④ **跨页返回先问 has**：管理页可能从书架→详情页进入、栈里没有阅读页 ⇒ 一律 pop() 退到错页；正解 = AppRouter.has(ROUTE_READER) ? pop() : push(ROUTE_READER, bookUrl)；多入口共用一条 @StorageLink 信号，@Watch 消费后立即清空。⑤ **功能面横铺三必查**：`$r('sys.symbol.xxx')` 先核 id_defined.json（写错不报错只渲染空白）；单文件同模块只写一行 import（拆两行视同重复声明）；新成员写到 struct 的 `}` 之后会引发几十条级联假错误（Property 'xxx' does not exist + UI component 'Column' cannot be used in this place），元凶在报错点之外 ⇒ 扫「独占一行的 }」定位提前闭合处（实证 615 行），别逐条改。坑点速查表 +3 行；v1.3.8: 新增 **LSN-030**（**存 URI 不复制文件 ⇒ 每次启动必须重新 activatePermission**，漏掉=重启后静默白屏）——🔴 极难定位：症状是「**导入当次完全正常、杀进程重开就白屏**」，代码零报错，画布只剩一层底色。机理三步：① 本地书/音乐不拷进沙箱 ⇒ 仓库存**原始 URI**，正文靠 fileShare 持久授权直读；② `persistPermission` 跨重启**不自动生效**，必须每次启动逐 URI 调 `activatePermission`（旧文 LSN-023 写的「picker URI 自带永久授权、persist/activate 仅作保险」**只在本次进程内成立**，已修正）；③ 漏掉 ⇒ `openSync` 抛 `13900001 EPERM` ⇒ catch 静默 return ⇒ 渲染层拿空内容 ⇒ 纯色白屏。正解双保险 = 启动链路 `await BookRepo.activatePermissions()` + 读取路径 `FilePermission.ensureActive(uri)`；参考实现见 Icey-Player-Harmony `MediaScanner.ets:540`（注释原文「存原始 URI，重启后通过 activatePermission 恢复访问，不复制文件」）。配套确立 **绝不静默失败**：凡「内容读到空 ⇒ 界面整片空」的路径（记录缺失/目录为空/**正文 0 字**/排版 0 页/读文件抛异常）都必须渲染**可见错误态 + 重试入口**。坑点速查表 +2 行。来源：Icey-Reader 阅读器两次报白屏，前几轮误判在 canvas 尺寸/排版口径，真因是剪裁模板时漏抄权限激活；v1.3.7: 新增 **LSN-029**（`.gitignore` 签名约定）——修正本 Skill 内置模板 `assets/template/.gitignore` 第 13 行的**裸 `signing/`**：此写法会把整个签名目录忽略（仓库里一个 p7b/cer/p12/csr 都没有，新机器 clone 后构建不出可安装包、安装报 `9568320 no signature file`，且 `git status` 里永远看不见，极易漏提交）。定案规则 = **签名材料必须进仓库**，只忽略 `/signing/material/` 与 `/signing/debug/material/`（hap-sign-tool 哈希中间缓存，每次构建可重建）。⚠️ 两条都要写（参考项目只写了前者，漏掉 debug 下的 material）；⚠️ 验证口径用 `git ls-files | grep material`（`git check-ignore` 判目录不可信）。坑点速查表 +1 行；v1.3.6: 扩充 **LSN-025**（实色大卡改多卡光感）——补两条『改版后才暴露』的规则：① **只读内容块（备注 / 说明正文）同样要承载**：玻璃卡面上直接铺正文在深浅两色下都可能不清晰，应套一层与输入框同款容器（`surface` 底 + `borderRadius 12` + `0.5vp colors.fieldBorder` 描边），好处是『同一份内容表单页是 TextArea、详情页是同款承载』，视觉语言一致。② **详情/只读页字段为空时不要整块隐藏**：`if (hasNote) { 备注卡 }` ⇒ 用户分不清『没填』与『不支持』（本工程实证：详情页备注卡原为『无备注不渲染』→ 用户随即报『详情页要能显示备注』）；正解 = 字段卡**常驻** + 空值占位（『暂无备注』）⇒ 详情/只读页与表单页**相反**（表单页空字段不渲染更清爽，因为没有『这一栏存在与否』的疑问）。坑点速查表 +1 行；v1.3.5: 新增 **LSN-028**（**同一组件「点击 + 长按」+ 详情页自动刷新**，三坑皆『编译全绿、仅真机暴露』）：① `.onClick` 与 `.gesture(LongPressGesture)` **并存** ⇒ 长按命中后抬手**又触发点击** ⇒ 连跳两页（进编辑页又跳详情页）；正解 = **互斥手势组** `GestureGroup(GestureMode.Exclusive, LongPressGesture, TapGesture)`（『先满足条件者胜出』；❌ 不要 Parallel）。② 子页要在『外部数据变更后』刷新时，**别把重算结果放普通字段缓存**——刷新链尾段是『父重渲染会不会顺带重跑 @Builder』这一**不确定行为**，症状 = 编辑保存返回仍是旧值、退出重进才对；正解 = **`@State` 视图模型 + `@Watch` 驱动重算**（`@Watch` 写在状态装饰器**之前**，LSN-012）+ **入参只取 id、不持快照**（`repo.find(id)` 为 null ⇒ 渲染『记录不存在』兜底卡，不在 build 里 pop）。③ **`ForEach` 的 key 只写『身份』不写『值』** ⇒ 项还在、值变了 ⇒ 复用既有节点、不重跑 `@Builder` ⇒ 永远停在旧值；正解 = key 带上会变的值。坑点速查表 +3 行；v1.3.4: 新增 **LSN-027**（**长按手势**）：`Stack`/`Column` 等容器**没有 `.onLongPress` 修饰符**（写 `.onLongPress(...)` 报 `10505001 Property 'onLongPress' does not exist on type 'StackAttribute'/'ColumnAttribute'`）；正确写法 = **`LongPressGesture` 手势描述符 + 容器根节点 `.gesture(LongPressGesture({ duration: 500 }).onAction(...))`**，且 `LongPressGesture` 是 ArkUI **全局声明、无需 import**（`import { LongPressGesture } from '@kit.ArkUI'` 会报 `10311006 ... is not exported from Kit '@kit.ArkUI'`）。含挂载点选择（根容器 + `hitTestBehavior(None)` 承载层不拦截）、与宿主 `List` 滚动手势共存原理、`repeat` 适用场景，以及「点击改长按」时的**口径变更规范**（`.onClick` 整段替换 + 回调属性同步改名让调用点漏改编译失败 + 复用组件回调做带默认空实现的可选属性）。坑点速查表 +1 行；v1.3.3: 扩充 **LSN-023**（自定义壁纸）——补『**两组载体各自的蒙版来源**』对照表：主界面 = `Index` 的 `HdsNavigation.backgroundColor`（`colors.background`，壁纸时 ≈70% 白，整屏压暗）+ `buildHomeTitleBar` 滚动蒙层 `#CCFFFFFF`（80% 白块）；子页 = `SubPageScaffold` 条件透明 + `buildSubPageTitleBar(..., true, ...)`。子页默认已透明、**主界面极易漏**（本模板即出现『子页干净、主界面发白』）。附两处排查细节：`HdsNavigation` 属性链上 `backgroundColor` **可能写了两次（后写生效）**；根 `Stack` 底色在壁纸 `Image` **之下**，应保留不透明作解码兜底。坑点速查表 +1 行；v1.3.2: 新增 LSN-026（**沉浸光感必须有「可采样底层」**：材质采样的是组件背后的窗口内容，页面背景若是**纯色**（无壁纸/无内容）⇒ 材质/毛玻璃无信息可采，卡片退化成『与页面同色的灰玻璃』，浅色下只剩一圈模糊边。修法：把『有底层』做成 `materialActive(forceOn, backdrop)` 的**第二形参**（漏改即编译失败），无底层时**不下发材质**并回落实色卡底（`cardBg` 白/深灰）+ 去掉模糊；hero 卡回不透明渐变、chips 回实色、弹窗底改不透明。诊断串加『底层』一档）；坑点速查表 +1 行；v1.3.1: 新增 LSN-025（**实色大卡改多卡光感的三件事**：① 卡内控件可辨性——卡片从实色 cardBg 换玻璃后 `surface` 浅填充与卡面几乎同色导致『输入框消失』，须加 0.5vp `colors.fieldBorder` 发丝描边（保留实色填充 ⇒ 文字对比度不受材质影响）；`surface` 次级按钮直接贴页面背景同理几乎不可见 ⇒ 操作区须留在卡片内；② **属性链必须写在内层容器 `}` 之后、外层自定义组件 `}` 之前**，写成 `}`→`}`→`.width()` 会报 `10505001 Declaration or statement expected` + `Cannot find name 'width'`（报错点比真实元凶低一层，与附录 D7 同源）；③ 分卡边界直接取原 `sectionTitle` 锚点，`if (分支)` 内可放多个 ListItem，标题样式统一为卡片标题规格）；坑点速查表 +2 行；v1.3.0: ★ 沉浸光感材质 + 自定义壁纸 双能力沉淀。①【光感】模板内置 services/SystemMaterial.ets（惰性构造 ImmersiveMaterial / 三档缓存 / applyMaterialCarrier / pressLightColor / fallbackSurface / materialDiagnostics 诊断）+ components/MaterialCard（MaterialCardLayer 承载层——仅 ToggleType.Button 可承载整块矩形材质，五条属性缺一不可；MaterialCard 卡片外壳 + 降级毛玻璃）；坑点速查表 +5 行（承载层写法 / 不显示四排查 / photoUris 字段 / 资源引用成对检查）。新增 LSN-022（光感四条层级规则 / 承载层五条属性 / 三件事降级 / 四形态接入）、LSN-023（壁纸 photoUris + 三链路重放）、LSN-024（资源引用报错指向中间产物）。②【模板修复】compatibleSdkVersion 6.1.0(23)→26.0.0（光感为 API 26 能力）；修复 startWindowIcon 残留引用 $media:tab_music 资源缺失；**修复全部 23 个既有 ArkTS 编译错误，模板 assembleHap 构建通过**（getInstance 漂移 / Blank 嵌套 / 缺 import / bindSheet 挂自定义组件 / 可选字段未判空——错误模式已登记「模板健康状态」）。v1.2.0: 图标体系换代 + SDK 版本书写规范修正。①【图标】按用户要求**弃用自研 SVG 图标组件、统一改用鸿蒙官方符号** `SymbolGlyph($r('sys.symbol.*'))`——零资源文件、随字体缩放、`.fontColor([...])` 支持分层多色；同步迁移内置模板（SettingItem 的 `icon:string`→`iconSymbol:Resource`、SettingsGroupEntry 同改、Index 的 4 个 Tab 与各页图标）并**删除 SFIcon 组件与 28 个失效 SVG**；新增 LSN-020（含选名方法、`$r` 编译期字面量约束、组件 API 变形、易错点、本项目符号映射表、以及『符号名写错不报错只是空白 ⇒ 必须截图验证』）。②【SDK】新增 LSN-021 并**修正 D5**：SDK 版本号格式**按 API 级别分界**——API < 26 用 `x.y.z(api)`，**API ≥ 26 用点分制 `major.minor.patch`**（读 hvigor 源码 `FIRST_DOT_API_VERSION = 26` + 官方文档双重确认）；给 26 加 `(26)` 报 00308018、26 前漏 `(api)` 报 00306042；坑点速查表 +3 行；v1.1.11: 新增 LSN-019「@Builder 按值传参不刷新——改了值界面不变、但重开又对了」。含同文件『对照实验』确诊法（同一状态机制下，内联 Row 正常 / 走 @Builder 异常 ⇒ 唯一差异即元凶）、三种修法（内联 build / 对象字面量按引用传参 / 子组件 @Prop）、同根因的其余受害者（分段控件 selected 高亮、开关行 isOn 回显、动态 fieldLabel 文案），以及**极易骗人的验证姿势警告**：别用"保存后重开看值对不对"验证（值本来就对，会误判为无 bug），必须停留在当前页看 UI 是否即时刷新。坑点速查表 +1 行；v1.1.10: 新增 LSN-018「启动竞态：AppStorage.set 对不存在的键静默空操作 → 列表页永久加载中」，含双重根因分析（写入落空 + 无条件建键覆盖）、三处协同修法、isReady() 约定与验证姿势；同步修复内置模板（附录 C 新增 D10）；坑点速查表 +1 行；v1.1.9: 新增 LSN-017「签名与安装三连坑」——① signingConfigs 声明≠使用（product 必须显式 signingConfig 才产出 signed hap，否则 9568320 no signature file）；② 改 bundleName 后 IDE 缓存 .idea/.deveco/project.cache.json 仍用旧包名，必须 Sync；③ 签名无法靠「Hap Signature Block 魔数」或「条目 diff」判定，唯一可靠判据是解包检索 kebab-case 的 bundle-name/app-identifier/debug-info（含 hdc 真机验证标准动作）；铁律 +2 条（#38/#39）、坑点速查表 +2 行；v1.1.8: 新增 LSN-016「跨组件传 @Builder 会丢 this——菜单能弹出、点一下才崩（undefined is not callable）」，含三步闭锁定性法 + 配置化替代方案（@Prop 数据 + 普通函数属性回调）；坑点速查表 +2 行；同步修复内置模板 SettingItem 的 @BuilderParam menu 缺陷；v1.1.7: 新增 LSN-015「跨组件只传展示型数据类」（@Prop 深拷贝会丢方法 + 视图层禁止重算业务值，两条约束指向同一架构）；坑点速查表再 +2 行（ListView 子项里的横向滚动条必须显式设高、给子组件传列表数据要用纯数据类）；v1.1.6: 新增 LSN-014「width('100%') 与横向 margin 不可同挂」（卡片右端被 List 裁切成直角，用户报「显示不全」；含截图逐像素取证法 + 横向内缩统一归宿主 List padding 的规范写法）；坑点速查表新增「卡片左右内缩」行；v1.1.5: 新增附录 C 缺陷 D5~D9（模板原样复制后 4 处必然编译失败：targetSdkVersion 格式非法 / HdsNavigationTitleBarOptions 未 import / 自定义组件后链式 bindSheet / Blank 直接作 ListItem 子组件）；新增 LSN-013 模板缺陷清单与坑点速查表同步；v1.1.4: LSN-012 @Watch 顺序与跨 Tab 级联"
+version: 1.4.0
+changelog: "v1.4.0: 新增 **LSN-034**（**SDK 级组件「点不动」的第三类根因 = 包裹层；以及「无限 loading」的三条机制**）——来源：Icey-Reader 第十一轮（用户原话「还是点不动阅读页 我怀疑是不是全屏的问题导致的？要不还原下 然后就是 如果我短时间多次返回进入 会出现一致显示正在排版的问题 请优化」）。**A. 点不动第三次复发 ⇒ 根因不再只是几何变换**：排除法顺序 = 先证伪「窗口级全屏」（`git show HEAD:` 看该能力**本来就存在**且当时可交互 ⇒ 非根因），再证伪几何变换（已删干净），最后收敛到**包裹层**。判据来自项目里已写下的对照实验结论：「SDK 内部控制器只在**组件直挂真·路由页页面根 Stack** 的形态下可靠建立」「刻意不套 Navigation 是为了不重新引入『被包裹』这个变量」⇒ 推广成通用判据：**对接 SDK 级重组件（Reader Kit / Map / Camera / XComponent 类）时，组件与页面根之间每多一层容器都是一个独立变量，且不论该层是否参与变换**（视觉层/自定义组件/带 padding 的容器都算）。★ 两条铁律必须**同时**满足：**零变换**（LSN-032）+ **零包裹层**（本条）——只做一条症状原样复发，这就是「修了两次还点不动」的完整解释。修法 = 容器全删、`build()` 直挂 `pageRoot()`；状态栏避让**绝不给组件本体加 padding**（padding 会让 SDK 仿真翻页动画在组件内容盒内合成、padding 区成硬裁切线 ⇒ 动画上下被裁切）⇒ 改「**组件自身 height + 顶部 margin**」（margin 不计入自身高 ⇒ 真实高 == 上报 SDK 的 viewPortHeight，两者严格同源，否则表现为「最后一行显示不全」），并配 `Stack({alignContent: Alignment.Top})`（默认 Center 会先居中再被 margin 推下 ⇒ 底部溢出半屏）；`safeTop` 首帧为 0 属**安全方向**（暂时偏上、不裁内容，且只 0→真值不回退）。⚠️ **撤掉「一镜到底/飞行层」必须整条链路一起撤**（起手调用点 + 判定点 + 中继文件 + 消费者组件），否则残留「起了手却没人播动画 ⇒ 用它关掉了整页转场 ⇒ **硬切**」（比不做更差）；删除前先 grep 出**同名但不同机制**的另一个 id 逐个判定（本项目 `heroIdOf`=geometryTransition 配对 id，服务书架→详情页的独立 hero，保留；`heroNodeIdOf`=组件 `.id()` 仅供 getRectangleById，随通道撤除）。**B. 快速多次「返回→进入」永远显示正在排版** = 三条机制叠加：① 退出时把 `release()` 排进延迟批次（为让开转场），而 **SDK 控制器在新旧会话间是同一个实例**（进程/组件级）⇒ 用户 ~50ms 内重进、新会话已 start()，旧页面在 T+420ms 才 releaseBook() ⇒ **从外部释放掉新会话** ⇒ pageShow 永不回调；② `on(type, cb)` 是**追加**语义 ⇒ 重试/重进叠加 N 层回调（处理函数跑 N 遍，重复计数/落盘/load，**完全不报错**）；③ `loading` 只靠外部事件 pageShow 收起 ⇒ 无超时出路就是永久 loading。修法 = `release()` **立即执行**（释放 native 资源不是耗时操作，留在延迟批次换不来流畅度却制造竞态）+ 延迟批次只留真正耗时的（全库序列化落盘/跨进程窗口调用/统计结账）+ **先 off 再 on**（注册即替换；`off` 省略 callback = 注销全部）+ **两道分开的看门狗**（`readyWatchdog` 管组件挂载前 8s / `pageWatchdog` 管 startPlay 后的外部事件 6s，超时强制收 loading + 渲染可见错误态带重试）+ 入口防重入守卫 + 回调 `disposed` 守卫。坑点速查表 +2 行；LSN-032 补「第三次复发」说明与补充口诀。验证：`CompileArkTS` ERROR=0（WARN 170）、`assembleHap` 产物 2,876,954 B；v1.3.9: 新增 **LSN-031**（**Canvas 自绘正文「长按划选」+ 功能面横向铺开**）——来源：Icey-Reader 用户要求「照着 legado 把该做的功能都做了」，阅读页一轮补齐书签/笔记/划选/书内搜索/阅读统计/书架分组/排版扩展，全部用鸿蒙特性（沉浸光感/符号/系统组件）。五条坑：① **Canvas 字符命中禁比例估下标**，走三层收敛 = `localX/px2vp − 页边距` ⇒ 页内容区；按行 y 区间定位行（`行高 = 字号 × lineSpacing`，**标题行字号 +2**）；行内找「最后一个左缘 ≤ cx」的字形、过右缘中点 +1 ⇒ 章内偏移 `line.charStart + idx`；★ **排版期必须存每行 charStart**，交互期无法反推。② **划选与翻页同一手势分流**：复用既有 PanGesture（selecting 态改作 extendSelect，否则翻页），❌ 不要新增第二个 Pan；进入划选用 LongPressGesture({repeat:false,duration:400})，退出后直接 return 不再触发翻页。③ **划选底衬逐行画**：选中区间是章内偏移、绘制在当前页坐标系 ⇒ 求行∩区间交集后逐行 fillRect（accent alpha≈0.22，叠在文字之下）；直接拿 selStart/selEnd 当 x/y 会跑到页外。④ **跨页返回先问 has**：管理页可能从书架→详情页进入、栈里没有阅读页 ⇒ 一律 pop() 退到错页；正解 = AppRouter.has(ROUTE_READER) ? pop() : push(ROUTE_READER, bookUrl)；多入口共用一条 @StorageLink 信号，@Watch 消费后立即清空。⑤ **功能面横铺三必查**：`$r('sys.symbol.xxx')` 先核 id_defined.json（写错不报错只渲染空白）；单文件同模块只写一行 import（拆两行视同重复声明）；新成员写到 struct 的 `}` 之后会引发几十条级联假错误（Property 'xxx' does not exist + UI component 'Column' cannot be used in this place），元凶在报错点之外 ⇒ 扫「独占一行的 }」定位提前闭合处（实证 615 行），别逐条改。坑点速查表 +3 行；v1.3.8: 新增 **LSN-030**（**存 URI 不复制文件 ⇒ 每次启动必须重新 activatePermission**，漏掉=重启后静默白屏）——🔴 极难定位：症状是「**导入当次完全正常、杀进程重开就白屏**」，代码零报错，画布只剩一层底色。机理三步：① 本地书/音乐不拷进沙箱 ⇒ 仓库存**原始 URI**，正文靠 fileShare 持久授权直读；② `persistPermission` 跨重启**不自动生效**，必须每次启动逐 URI 调 `activatePermission`（旧文 LSN-023 写的「picker URI 自带永久授权、persist/activate 仅作保险」**只在本次进程内成立**，已修正）；③ 漏掉 ⇒ `openSync` 抛 `13900001 EPERM` ⇒ catch 静默 return ⇒ 渲染层拿空内容 ⇒ 纯色白屏。正解双保险 = 启动链路 `await BookRepo.activatePermissions()` + 读取路径 `FilePermission.ensureActive(uri)`；参考实现见 Icey-Player-Harmony `MediaScanner.ets:540`（注释原文「存原始 URI，重启后通过 activatePermission 恢复访问，不复制文件」）。配套确立 **绝不静默失败**：凡「内容读到空 ⇒ 界面整片空」的路径（记录缺失/目录为空/**正文 0 字**/排版 0 页/读文件抛异常）都必须渲染**可见错误态 + 重试入口**。坑点速查表 +2 行。来源：Icey-Reader 阅读器两次报白屏，前几轮误判在 canvas 尺寸/排版口径，真因是剪裁模板时漏抄权限激活；v1.3.7: 新增 **LSN-029**（`.gitignore` 签名约定）——修正本 Skill 内置模板 `assets/template/.gitignore` 第 13 行的**裸 `signing/`**：此写法会把整个签名目录忽略（仓库里一个 p7b/cer/p12/csr 都没有，新机器 clone 后构建不出可安装包、安装报 `9568320 no signature file`，且 `git status` 里永远看不见，极易漏提交）。定案规则 = **签名材料必须进仓库**，只忽略 `/signing/material/` 与 `/signing/debug/material/`（hap-sign-tool 哈希中间缓存，每次构建可重建）。⚠️ 两条都要写（参考项目只写了前者，漏掉 debug 下的 material）；⚠️ 验证口径用 `git ls-files | grep material`（`git check-ignore` 判目录不可信）。坑点速查表 +1 行；v1.3.6: 扩充 **LSN-025**（实色大卡改多卡光感）——补两条『改版后才暴露』的规则：① **只读内容块（备注 / 说明正文）同样要承载**：玻璃卡面上直接铺正文在深浅两色下都可能不清晰，应套一层与输入框同款容器（`surface` 底 + `borderRadius 12` + `0.5vp colors.fieldBorder` 描边），好处是『同一份内容表单页是 TextArea、详情页是同款承载』，视觉语言一致。② **详情/只读页字段为空时不要整块隐藏**：`if (hasNote) { 备注卡 }` ⇒ 用户分不清『没填』与『不支持』（本工程实证：详情页备注卡原为『无备注不渲染』→ 用户随即报『详情页要能显示备注』）；正解 = 字段卡**常驻** + 空值占位（『暂无备注』）⇒ 详情/只读页与表单页**相反**（表单页空字段不渲染更清爽，因为没有『这一栏存在与否』的疑问）。坑点速查表 +1 行；v1.3.5: 新增 **LSN-028**（**同一组件「点击 + 长按」+ 详情页自动刷新**，三坑皆『编译全绿、仅真机暴露』）：① `.onClick` 与 `.gesture(LongPressGesture)` **并存** ⇒ 长按命中后抬手**又触发点击** ⇒ 连跳两页（进编辑页又跳详情页）；正解 = **互斥手势组** `GestureGroup(GestureMode.Exclusive, LongPressGesture, TapGesture)`（『先满足条件者胜出』；❌ 不要 Parallel）。② 子页要在『外部数据变更后』刷新时，**别把重算结果放普通字段缓存**——刷新链尾段是『父重渲染会不会顺带重跑 @Builder』这一**不确定行为**，症状 = 编辑保存返回仍是旧值、退出重进才对；正解 = **`@State` 视图模型 + `@Watch` 驱动重算**（`@Watch` 写在状态装饰器**之前**，LSN-012）+ **入参只取 id、不持快照**（`repo.find(id)` 为 null ⇒ 渲染『记录不存在』兜底卡，不在 build 里 pop）。③ **`ForEach` 的 key 只写『身份』不写『值』** ⇒ 项还在、值变了 ⇒ 复用既有节点、不重跑 `@Builder` ⇒ 永远停在旧值；正解 = key 带上会变的值。坑点速查表 +3 行；v1.3.4: 新增 **LSN-027**（**长按手势**）：`Stack`/`Column` 等容器**没有 `.onLongPress` 修饰符**（写 `.onLongPress(...)` 报 `10505001 Property 'onLongPress' does not exist on type 'StackAttribute'/'ColumnAttribute'`）；正确写法 = **`LongPressGesture` 手势描述符 + 容器根节点 `.gesture(LongPressGesture({ duration: 500 }).onAction(...))`**，且 `LongPressGesture` 是 ArkUI **全局声明、无需 import**（`import { LongPressGesture } from '@kit.ArkUI'` 会报 `10311006 ... is not exported from Kit '@kit.ArkUI'`）。含挂载点选择（根容器 + `hitTestBehavior(None)` 承载层不拦截）、与宿主 `List` 滚动手势共存原理、`repeat` 适用场景，以及「点击改长按」时的**口径变更规范**（`.onClick` 整段替换 + 回调属性同步改名让调用点漏改编译失败 + 复用组件回调做带默认空实现的可选属性）。坑点速查表 +1 行；v1.3.3: 扩充 **LSN-023**（自定义壁纸）——补『**两组载体各自的蒙版来源**』对照表：主界面 = `Index` 的 `HdsNavigation.backgroundColor`（`colors.background`，壁纸时 ≈70% 白，整屏压暗）+ `buildHomeTitleBar` 滚动蒙层 `#CCFFFFFF`（80% 白块）；子页 = `SubPageScaffold` 条件透明 + `buildSubPageTitleBar(..., true, ...)`。子页默认已透明、**主界面极易漏**（本模板即出现『子页干净、主界面发白』）。附两处排查细节：`HdsNavigation` 属性链上 `backgroundColor` **可能写了两次（后写生效）**；根 `Stack` 底色在壁纸 `Image` **之下**，应保留不透明作解码兜底。坑点速查表 +1 行；v1.3.2: 新增 LSN-026（**沉浸光感必须有「可采样底层」**：材质采样的是组件背后的窗口内容，页面背景若是**纯色**（无壁纸/无内容）⇒ 材质/毛玻璃无信息可采，卡片退化成『与页面同色的灰玻璃』，浅色下只剩一圈模糊边。修法：把『有底层』做成 `materialActive(forceOn, backdrop)` 的**第二形参**（漏改即编译失败），无底层时**不下发材质**并回落实色卡底（`cardBg` 白/深灰）+ 去掉模糊；hero 卡回不透明渐变、chips 回实色、弹窗底改不透明。诊断串加『底层』一档）；坑点速查表 +1 行；v1.3.1: 新增 LSN-025（**实色大卡改多卡光感的三件事**：① 卡内控件可辨性——卡片从实色 cardBg 换玻璃后 `surface` 浅填充与卡面几乎同色导致『输入框消失』，须加 0.5vp `colors.fieldBorder` 发丝描边（保留实色填充 ⇒ 文字对比度不受材质影响）；`surface` 次级按钮直接贴页面背景同理几乎不可见 ⇒ 操作区须留在卡片内；② **属性链必须写在内层容器 `}` 之后、外层自定义组件 `}` 之前**，写成 `}`→`}`→`.width()` 会报 `10505001 Declaration or statement expected` + `Cannot find name 'width'`（报错点比真实元凶低一层，与附录 D7 同源）；③ 分卡边界直接取原 `sectionTitle` 锚点，`if (分支)` 内可放多个 ListItem，标题样式统一为卡片标题规格）；坑点速查表 +2 行；v1.3.0: ★ 沉浸光感材质 + 自定义壁纸 双能力沉淀。①【光感】模板内置 services/SystemMaterial.ets（惰性构造 ImmersiveMaterial / 三档缓存 / applyMaterialCarrier / pressLightColor / fallbackSurface / materialDiagnostics 诊断）+ components/MaterialCard（MaterialCardLayer 承载层——仅 ToggleType.Button 可承载整块矩形材质，五条属性缺一不可；MaterialCard 卡片外壳 + 降级毛玻璃）；坑点速查表 +5 行（承载层写法 / 不显示四排查 / photoUris 字段 / 资源引用成对检查）。新增 LSN-022（光感四条层级规则 / 承载层五条属性 / 三件事降级 / 四形态接入）、LSN-023（壁纸 photoUris + 三链路重放）、LSN-024（资源引用报错指向中间产物）。②【模板修复】compatibleSdkVersion 6.1.0(23)→26.0.0（光感为 API 26 能力）；修复 startWindowIcon 残留引用 $media:tab_music 资源缺失；**修复全部 23 个既有 ArkTS 编译错误，模板 assembleHap 构建通过**（getInstance 漂移 / Blank 嵌套 / 缺 import / bindSheet 挂自定义组件 / 可选字段未判空——错误模式已登记「模板健康状态」）。v1.2.0: 图标体系换代 + SDK 版本书写规范修正。①【图标】按用户要求**弃用自研 SVG 图标组件、统一改用鸿蒙官方符号** `SymbolGlyph($r('sys.symbol.*'))`——零资源文件、随字体缩放、`.fontColor([...])` 支持分层多色；同步迁移内置模板（SettingItem 的 `icon:string`→`iconSymbol:Resource`、SettingsGroupEntry 同改、Index 的 4 个 Tab 与各页图标）并**删除 SFIcon 组件与 28 个失效 SVG**；新增 LSN-020（含选名方法、`$r` 编译期字面量约束、组件 API 变形、易错点、本项目符号映射表、以及『符号名写错不报错只是空白 ⇒ 必须截图验证』）。②【SDK】新增 LSN-021 并**修正 D5**：SDK 版本号格式**按 API 级别分界**——API < 26 用 `x.y.z(api)`，**API ≥ 26 用点分制 `major.minor.patch`**（读 hvigor 源码 `FIRST_DOT_API_VERSION = 26` + 官方文档双重确认）；给 26 加 `(26)` 报 00308018、26 前漏 `(api)` 报 00306042；坑点速查表 +3 行；v1.1.11: 新增 LSN-019「@Builder 按值传参不刷新——改了值界面不变、但重开又对了」。含同文件『对照实验』确诊法（同一状态机制下，内联 Row 正常 / 走 @Builder 异常 ⇒ 唯一差异即元凶）、三种修法（内联 build / 对象字面量按引用传参 / 子组件 @Prop）、同根因的其余受害者（分段控件 selected 高亮、开关行 isOn 回显、动态 fieldLabel 文案），以及**极易骗人的验证姿势警告**：别用"保存后重开看值对不对"验证（值本来就对，会误判为无 bug），必须停留在当前页看 UI 是否即时刷新。坑点速查表 +1 行；v1.1.10: 新增 LSN-018「启动竞态：AppStorage.set 对不存在的键静默空操作 → 列表页永久加载中」，含双重根因分析（写入落空 + 无条件建键覆盖）、三处协同修法、isReady() 约定与验证姿势；同步修复内置模板（附录 C 新增 D10）；坑点速查表 +1 行；v1.1.9: 新增 LSN-017「签名与安装三连坑」——① signingConfigs 声明≠使用（product 必须显式 signingConfig 才产出 signed hap，否则 9568320 no signature file）；② 改 bundleName 后 IDE 缓存 .idea/.deveco/project.cache.json 仍用旧包名，必须 Sync；③ 签名无法靠「Hap Signature Block 魔数」或「条目 diff」判定，唯一可靠判据是解包检索 kebab-case 的 bundle-name/app-identifier/debug-info（含 hdc 真机验证标准动作）；铁律 +2 条（#38/#39）、坑点速查表 +2 行；v1.1.8: 新增 LSN-016「跨组件传 @Builder 会丢 this——菜单能弹出、点一下才崩（undefined is not callable）」，含三步闭锁定性法 + 配置化替代方案（@Prop 数据 + 普通函数属性回调）；坑点速查表 +2 行；同步修复内置模板 SettingItem 的 @BuilderParam menu 缺陷；v1.1.7: 新增 LSN-015「跨组件只传展示型数据类」（@Prop 深拷贝会丢方法 + 视图层禁止重算业务值，两条约束指向同一架构）；坑点速查表再 +2 行（ListView 子项里的横向滚动条必须显式设高、给子组件传列表数据要用纯数据类）；v1.1.6: 新增 LSN-014「width('100%') 与横向 margin 不可同挂」（卡片右端被 List 裁切成直角，用户报「显示不全」；含截图逐像素取证法 + 横向内缩统一归宿主 List padding 的规范写法）；坑点速查表新增「卡片左右内缩」行；v1.1.5: 新增附录 C 缺陷 D5~D9（模板原样复制后 4 处必然编译失败：targetSdkVersion 格式非法 / HdsNavigationTitleBarOptions 未 import / 自定义组件后链式 bindSheet / Blank 直接作 ListItem 子组件）；新增 LSN-013 模板缺陷清单与坑点速查表同步；v1.1.4: LSN-012 @Watch 顺序与跨 Tab 级联"
 ---
 
 # 鸿蒙 App 模板基建 v1.3.9
@@ -136,7 +138,8 @@ changelog: "v1.3.9: 新增 **LSN-031**（**Canvas 自绘正文「长按划选」
 |---|---|---|---|
 | **05** | 页面根 Column 用 `height('100%')` | 在 Hds TabContent 内**溢出约 50vp** | 用 `.layoutWeight(1)` |
 | **06** | `layoutWeight(1)` + `justifyContent(SpaceBetween)` 联用 | 子项高度异常、内容离屏 | 二者禁止同用 |
-| **07** | 顶部留白硬编码 `112` | 换机型/折叠屏错位 | `Blank().height(SafeArea.top + 64)`（状态栏 + MINI 标题栏 56 + 8） |
+| **07** | 顶部留白硬编码 `112` | 换机型/折叠屏错位 | `Row() {}.height(SafeArea.top + 72)`（状态栏 + MINI 标题栏 56 + 16）。⚠️ **2026-10-01 修正：`+64` 已废弃**——因为 `maskExtraHeight: 28` 的滚动模糊带下缘是 `56 + 28 = 84vp`，`72` 才让内容出带；**且首卡必须自带 `margin-top: 12`**，否则卡顶停在 72、仍压在模糊带里（读作「卡片贴着标题栏、没有间距」）。见铁律 **14b** |
+| **07b** | 子页（`HdsNavDestination`）与 tab 主页留白「同值却仍不等」 | 反复调 `SafeArea.top + N` 永远调不平 ⇒ 用户反复报「子页离顶部更小」 | **两侧留白必须同源且同值**（都是 `SafeArea.top + 72`）；**唯一可调项是骨架上的容器补偿**：`SubPageScaffold` 的 `height('calc(100% + 10vp)')` + `margin({ top: -10 })`（成对出现，`embedded` 宽屏右栏无 NavDestination 壳 ⇒ 保持 `0` / `'100%'`）。⚠️ 若两侧留白已同值、补偿也已对齐 player，**仍能看出差值就不要再动这个数**——那是 Hds 运行时对 `NavDestination` 内容区的实际下移量，静态反解不了，正确做法是两侧首内容节点各打 `onAreaChange` **量 y** |
 | **08** | 内容顶部加固定空白 Column 做避让 | 内容被滚动模糊带压住 | List **视口顶到屏幕顶**，留白放**第一个 ListItem**，内容自然滑进模糊带 |
 | **09** | List 尾部不预留 | `barOverlap` 悬浮底栏遮住最后几项 | 末 ListItem `Blank().height(SafeArea.bottom + 80)`（子页 +40） |
 | **10** | 卡片用 `width('100%')` 同时又给 margin | 溢出 → 边距不生效 | 左右间距交给**父容器 ListItem padding** 或 GlassCard 自带 margin |
@@ -149,6 +152,8 @@ changelog: "v1.3.9: 新增 **LSN-031**（**Canvas 自绘正文「长按划选」
 | **12** | HdsNavigation / SubPageScaffold | `.ignoreLayoutSafeArea([0], [0])`（SYSTEM=0/TOP=0） | 状态栏后面是一条白/黑带 |
 | **13** | 根 Stack | `.expandSafeArea([SYSTEM],[TOP,BOTTOM])` + `.backgroundColor(ThemeManager.colors.background)` | 顶部露出裸白条 |
 | **14** | 滚动蒙层高度 | `maskExtraHeight: 28`（内容短的页调小） | 模糊带盖住卡片顶部 |
+| **14b** | 顶部留白给了、首卡却**无自带 `margin-top`** | 卡顶正好落在模糊带内（`SafeArea.top+72` ＜ 带下缘 `84`）→ 用户报「卡片和顶部的距离明显不大对」 | **留白 + 首卡间距两件事**：`Row() {}.height(SafeArea.top + 72)` **且**首卡 `margin-top: 12`（卡片组件默认就带，别改成 0）。参考实现 `Icey-Player-Harmony`：`GlassCard` / `SettingsGroupCard` 恒带 `margin: { left:16, right:16, top:12 }` |
+| **14c** | 拿「看起来自洽的常数」反解容器偏移（如"子页低 22vp ⇒ margin 取 -22"） | **伪造推导**：用户在错误状态下仍说不统一 ⇒ 该常数被证伪，白改一轮 | 只在**有真机量测证据**时才引入非零补偿；否则一律取已被真机验证过的 player 值（`-10` / `calc(100% + 10vp)`）。判据：**同源同值 + 补偿对齐 player** 之后仍有差值 ⇒ 停止调 margin，改量 y |
 
 > 记忆口诀：**标题栏避让 + 组件 ignore + 根节点 expand + 内容留白** = 四处配套。
 
@@ -240,7 +245,7 @@ changelog: "v1.3.9: 新增 **LSN-031**（**Canvas 自绘正文「长按划选」
 | 想实现 | ❌ 常见错误写法 | ✅ 模板正确写法 |
 |---|---|---|
 | 页面占满剩余高度 | `.height('100%')` | `.layoutWeight(1)`（Hds TabContent 内 100% 溢出 50vp） |
-| 顶部避让标题栏 | `Blank().height(112)` | `Blank().height(SafeArea.top + 64)` |
+| 顶部避让标题栏 | `Blank().height(112)` | `Row() {}.height(SafeArea.top + 72)`（`ListItem` 内 Blank 会编译失败，见下一行） |
 | 读取当前主题色 | 定义 `@State color` 缓存 colors 值 | 每次 build 直接读 `ThemeManager.colors.xxx`，版本号驱动重建 |
 | 弹窗背景色 | `ThemeManager.colors.background` | `ThemeManager.opaqueBackground` |
 | 判断深色模式 | `colorMode === 2` | `colorMode === 0`（DARK=0） |
@@ -261,7 +266,7 @@ changelog: "v1.3.9: 新增 **LSN-031**（**Canvas 自绘正文「长按划选」
 | 批量文件授权 | 一次性传全量 URI | 分批 200 条 + 处理 `13900001` 的 `err.data` 部分失败明细 |
 | 注册字体 | 在 onCreate 里注册 | 必须在 `loadContent` **回调里**注册 |
 | Service 层打日志 | `console.log` | `AppLogger.info/warn/error`（console 不进用户导出日志） |
-| 列表顶部/尾部留白 | `ListItem() { Blank().height(SafeArea.top + 64) }`（**编译失败**：Blank 只能嵌在 Row/Column/Flex） | `ListItem() { Row() {}.height(SafeArea.top + 64).width('100%') }` |
+| 列表顶部/尾部留白 | `ListItem() { Blank().height(SafeArea.top + 72) }`（**编译失败**：Blank 只能嵌在 Row/Column/Flex） | `ListItem() { Row() {}.height(SafeArea.top + 72).width('100%') }` |
 | 给子页挂 bindSheet | `SubPageScaffold({...}) { ... }.bindSheet(...)`（**编译失败**：build 被解析成两个根节点） | 把 bindSheet 挂到内容里的原生组件上：`SubPageScaffold({...}) { List(){...}.bindSheet(...) }` |
 | 声明 SDK 版本 | `"targetSdkVersion": "26.0.0"`（**构建直接失败** 00306042） | `"6.1.1(24)"` —— 先读 `<DevEco>/sdk/default/sdk-pkg.json` 的 `apiVersion`，格式必须 `x.y.z(api)` |
 | 写 Hds 标题栏 menu | `opts.content.menu = {...}`（可能是 undefined，编译报错） | `const c = opts.content; if (c !== undefined) { c.menu = {...}; }` |
@@ -285,6 +290,8 @@ changelog: "v1.3.9: 新增 **LSN-031**（**Canvas 自绘正文「长按划选」
 | 给已有嵌套组件插卡片边界 | 内层容器与外层组件两个 `}` 都写完了才写 `.width()/.padding()` → `10505001 Declaration or statement expected` + `Cannot find name 'width'`，**报错点比真实元凶低一层** | 修饰符写在**内层容器 `}` 之后、外层自定义组件 `}` 之前**（自定义组件闭括号后不能再挂属性链，与附录 D7 同源）（见 LSN-025） |
 | 设了自定义壁纸，但页面/顶部仍发白（用户口语「白色蒙版」） | 壁纸之上还有两层无色**不透明底**在盖：① 主界面 `HdsNavigation.backgroundColor = colors.background`（壁纸时 ≈70% 白，整屏压暗）② 首页标题栏滚动蒙层 `#CCFFFFFF`（80% 白块）。子页两条链默认已透明 ⇒ 只有主界面发白 | 改成与子页同口径：`HdsNavigation.backgroundColor` 条件透明（注意属性链上 **`backgroundColor` 可能写了两次，后写生效**）+ `buildHomeTitleBar(..., transparentScrollMask = true)`（见 LSN-023） |
 | 材质下方是**纯色背景**（无壁纸 / 页面无内容） | 材质/毛玻璃无信息可采 → 卡片退化成**「与页面同色的灰玻璃」**（浅色下只剩一圈模糊边，比原来的实色白卡更差）；不报错 | 把「有底层」做成 `materialActive(forceOn, backdrop)` 的**第二形参**；无底层时**不下发材质** + 回落实色 `cardBg`（浅色白 / 深色 #212121）+ **去掉模糊**（见 LSN-026） |
+
+**口诀**：**"玻璃要看得见，背后先得有东西；没有底层就回实色，别把纯色糊一遍"**
 | 修改模板/工程里的资源引用（$media/$color/$string） | 引用写对了名字但 `resources/base/media/` 里没有对应文件 → 构建报 `The resource reference '$media:xxx' is not defined`，且报错指向 **build 中间产物**，难以定位源头 | 引用与资源**成对检查**：改完先 `grep -rn '\$media:' --include="*.json5"` 列出全部引用，再 `ls resources/base/media/` 核对。⚠️ 报错路径是 `entry/build/.../module.json`（中间产物），**真实源头在 `src/main/module.json5`**（见 LSN-024） |
 | 给卡片/列表项做「长按」交互 | 写 `.onLongPress(() => {...})` 挂在 `Stack`/`Column` 上 → 报 `10505001 Property 'onLongPress' does not exist on type 'StackAttribute'`；再改成 `import { LongPressGesture } from '@kit.ArkUI'` → 报 `10311006 ... is not exported from Kit '@kit.ArkUI'` | **`LongPressGesture` 是 ArkUI 全局声明、无需 import**，写法 = 容器根节点 `.gesture(LongPressGesture({ duration: 500 }).onAction(() => {...}))`。内部"不吃手势"的承载层（`hitTestBehavior(None)` + `enabled(false)`）不拦截。改交互时回调属性**同步改名**让调用点漏改编译失败（见 LSN-027） |
 | 同一组件既要「点击」又要「长按」（如列表卡：点击看详情 / 长按编辑） | `.onClick(...)` + `.gesture(LongPressGesture(...))` **并存**（两个独立手势）：长按命中后抬手**又触发点击** ⇒ 连跳两页（进编辑页又跳详情页）。编译全绿、只有真机暴露 | 绑成**互斥手势组**：`.gesture(GestureGroup(GestureMode.Exclusive, LongPressGesture({duration:500}).onAction(...), TapGesture({count:1}).onAction(...)))` —— 独占模式"先满足条件者胜出"。❌ 不要 `GestureMode.Parallel`（两个都触发）（见 LSN-028） |
@@ -297,6 +304,10 @@ changelog: "v1.3.9: 新增 **LSN-031**（**Canvas 自绘正文「长按划选」
 | 给 Canvas 自绘的正文加"长按划选" | 用**比例**估字符下标（`x / 行宽`、`y / 页高`）⇒ 随字号 / 字距 / 段距变化**必然错位**（多选少选一个字、跨行乱选）。且排版产物只有整串文本、**没有每行的 `charStart`** ⇒ 拿不到章内偏移，选中的内容无法与书签 / 笔记定位对齐 | **三层收敛**：① `localX/px2vp − 页边距` ⇒ 页内容区坐标；② 按行的 y 区间定位行，`行高 = 字号 × lineSpacing`，**标题行字号 +2**（行高不同）；③ 行内找**最后一个左缘 ≤ cx** 的字形，过其右缘中点则 +1 ⇒ 章内偏移 `line.charStart + idx`。★ **排版期就把每行 `charStart` 存下来**，别在交互期反推。底衬要**逐行画**（求行 ∩ 选中区间的交集），不能拿章内偏移当页面坐标（见 LSN-031） |
 | 在已有 struct 里新增 `@Builder` / 方法 | 把新成员写到结构体 `}` **之后**（如插在文件末尾）⇒ 一条改动引发**几十条级联假错误**：`Property 'xxx' does not exist on type 'Xxx'` + `UI component 'Column' cannot be used in this place` + `Cannot find name 'b'`。**元凶不在报错点上**，逐条改会白费 | 用脚本扫「**独占一行的 `}`**」定位那个提前闭合处（本工程实证在 615 行），把成员**移回结构体内**（去掉多余的 `}`）即可，别按报错逐条补（见 LSN-031） |
 | 从管理页（书签列表 / 搜索结果）跳回阅读页 | 一律 `pop()` ⇒ 若用户是从**书架 → 书籍详情页**进入的管理页，路由栈里**没有阅读页** ⇒ pop 退到**错页**（详情页）而不是阅读页 | 先判存在再决定：`AppRouter.has(ROUTE_READER) ? pop() : push(ROUTE_READER, bookUrl)`（`has(name) = getAllPathName().indexOf(name) >= 0`）。配套：多个入口**共用一条 `@StorageLink` 跳转信号**，消费方 `@Watch` 读到后**立即清空**（见 LSN-031） |
+| 给"整页"加转场动画（缩放 / 翻页 / 位移） | 把变换挂在**包裹内容子树**的容器上 ⇒ **命中测试热区随变换后几何收窄**：`scale 0.29` 时热区只剩原尺寸 29%；`rotateY(-90°)` + `centerX:0` 时**投影宽 → 0 ⇒ 热区宽为 0 ⇒ 全页点不到**。⚠️ 而 `XComponent`（Reader Kit 的 `ReadPageComponent`）/ `Canvas` 这类 **native 直绘内容不受 ArkUI 变换影响** ⇒ 合成「**看得见、点不动**」这一最难排查的组合（自绘与 Kit 两条内核表现完全一致，极易被当成两个 bug） | **凡改变组件几何的修饰符（`scale` / `rotate` / `translate` / `rotate3D`…）一律不得挂在包裹内容子树的节点上** —— 无论它是不是"只是一个动画"。要"看起来像整页在动"就**另起一层纯视觉层**（同尺寸 + `hitTestBehavior(HitTestMode.None)` + 播完 `opacity 0`），内容层恒定满尺寸、恒定零变换。这样即使动画一帧都没跑，最坏也只是**视觉瑕疵**而非**静默致瘫**。★ 指纹 = 正文能看见但点击/手势全无响应，日志 `InputKeyFlow: Touch test result is empty.`（正常应为 `TTHNI:{ T: List, D: 36 }` 之类有节点）（见 LSN-032） |
+| 把图片 / 长文本存进 `preferences` | **`preferences` 的 string 值上限 = 8192 字节**（官方硬约束）⇒ 720w JPEG 的 base64 data URI（40~110 K 字符）**必然超限**，`putSync` 每次抛 `Parameter error. The type of 'value' must be ValueType.` 被 catch 吞掉 ⇒ **该槽位从未落盘**。★ 极具欺骗性：当次运行内存态有值 ⇒ **显示完全正常**；**重进 App `getSync` 读回空串 ⇒ 失效**（用户报「壁纸失效 / 重启就没了」） | `preferences` **只放轻量标量**（开关 / 档位 / 短字符串 / 路径 / `file://` URI）；图片、长 JSON、二进制**一律落沙箱文件**，只存路径。路径转 URI 用官方 `fileUri.getUriFromPath()`，别手拼 `'file://' + path`。**并给 `save()` 加显式长度预检**（`value.length > 8192` 就报 error 并放弃写入）——让"存了却没生效"在运行日志里一眼可定位，不再静默丢值（见 LSN-033） |
+| 对接 SDK 级重组件（Reader Kit / Map / Camera / 各种 `XComponent`）时页面「**看得见、点不动**」 | 删干净全部几何变换后**仍然点不动**（同一 P0 复发第 3 次）⇒ 根因换成了**包裹层**：SDK 内部控制器只在「组件**直挂**真·路由页页面根 Stack」的形态下可靠建立。组件与页面根之间**每多一层容器都是一个独立变量**，**不论它是否参与变换**（视觉层 / 自定义组件 / 带 padding 的容器都算）。★ 排除法顺序：先证伪"窗口级全屏"（`git show HEAD:` 看它**本来就存在**⇒非根因），再证伪几何变换，最后收敛到层数 | **两条铁律必须同时满足**：**零变换**（LSN-032）+ **零包裹层**（本条）。容器一律删掉、`build()` 直挂 `pageRoot()`；状态栏避让**绝不给组件本体加 `padding`**（padding 会让 SDK 仿真翻页动画在**组件内容盒内**合成、padding 区成硬裁切线 ⇒ 动画上下被裁切）⇒ 改「**组件自身 `height` + 顶部 `margin`**」（margin 不计入自身高 ⇒ 真实高 == 上报 SDK 的 `viewPortHeight`，两者严格同源），并配 `Stack({ alignContent: Alignment.Top })`。⚠️ 撤掉"飞行层/一镜到底"必须**整条链路一起撤**（调用点 + 判定点 + 中继 + 组件），否则留下"起了手却没人播动画"⇒ 转场被关 ⇒ **硬切**（见 LSN-034 A） |
+| 快速多次「返回 → 进入」同一页 ⇒ **一直显示"正在排版 / 加载中"** | 三条机制叠加：① 退出时把 `release()` **排进延迟批次**（为让开转场），而 **SDK 控制器在新旧会话间是同一个实例**（进程级）⇒ 用户 ~50ms 内重进、新会话已 `start()`，旧页面在 T+420ms 才 `releaseBook()` ⇒ **从外部释放掉新会话** ⇒ `pageShow` 永不回调；② `on(type, cb)` 是**追加**语义 ⇒ 重试/重进叠加 N 层回调（处理函数跑 N 遍，**完全不报错**）；③ `loading` 只靠外部事件 `pageShow` 收起 ⇒ 无超时出路就是**永久 loading** | ① `release()` **立即执行**（释放 native 资源不是耗时操作，留在延迟批次换不来流畅度却制造竞态）；延迟批次只留**真正耗时**的（全库序列化落盘 / 跨进程窗口调用 / 统计结账）；② 注册即替换 —— **先 `off(type)` 再 `on`**（`off` 省略 callback = 注销该类型全部回调）；③ 加**两道分开的看门狗**：`readyWatchdog`（管组件挂载前，8s）与 `pageWatchdog`（管 `startPlay` 后的**外部**事件，6s），超时**强制收起 loading + 渲染可见错误态（带重试）**；④ 入口加防重入守卫、回调处理器加 `disposed` 守卫（见 LSN-034 B） |
 
 ---
 
@@ -1032,7 +1043,44 @@ ListItem() {
 并在设置项副标题里写清前置条件：本工程即改为
 「有自定义壁纸时卡片走系统「沉浸光感」材质，无壁纸时回落实色卡片」。
 
-**口诀**：**"玻璃要看得见，背后先得有东西；没有底层就回实色，别把纯色糊一遍"**
+### 补遗（2026-10-02，reader / Icey-Reader 实测三连）：门槛对了，颜色还会不对
+> 上面四步做完，**"卡片该不该走材质"已经正确**；但用户仍可能反馈「卡片颜色不对」。
+> 那是另外两条**独立**成因，必须分别修——只修门槛不会消失。
+
+**① 薄层材质不该额外着色**（`materialColor` 必须 `Color.Transparent`）
+- 症状：有壁纸时卡片发**"奶白"**、玻璃感被抹平；无壁纸时卡面比页面**灰一档**。
+- 根因：材质出口函数对**所有** scope 都喂了 `systemMaterialColor()`（浅色 = 42% 白 `#6BFFFFFF`）。
+  42% 白是"给弹窗**面板**压住内容"用的，套到薄层卡片上就是一层白纱。
+- 正解（与 player `SettingsManager` 同口径）：
+  | 场景 | materialColor |
+  |---|---|
+  | `'sheet'`（弹窗**面板**） | 按挡位着色 |
+  | `'menu'` / `'search'` / `'system'`（**薄层**） | **`Color.Transparent`** |
+  ⇒ 挡位差异只由 `style` 表达，着色不参与薄层。单函数出口就写 `scope === 'sheet' ? 着色 : Transparent`。
+
+**② 无壁纸的兜底底必须是 `cardBg` 实色 + `BlurStyle.NONE`**
+- 症状：无壁纸时卡面是**"一块与页面糊在一起的灰玻璃"**（与 026 首版症状同源，但成因不同）。
+- 根因：兜底色沿用了**半透明** `#B3F2F3F5` + `BlurStyle.Thin`——那是"材质不可用一律配毛玻璃"
+  时代的写法（半透明才透得出模糊）。但**无壁纸时既没有东西可透、又让卡片与页面糊在一起**。
+- 正解（三态表，与 LSN-026 第 2 步合并成同一张表）：
+  | 状态 | backgroundColor | backgroundBlurStyle |
+  |---|---|---|
+  | 有壁纸 + 材质可用 | `Color.Transparent`（材质接管） | `NONE`（材质自带模糊，双层发灰） |
+  | 有壁纸 + 材质不可用 | `Color.Transparent` | `COMPONENT_REGULAR` / `Thin` |
+  | **无壁纸**（不论材质可用与否） | **`colors.cardBg` 实色** | **`NONE`** |
+
+**③ 门槛要分「页面卡片 / 弹窗卡片」两套，且页面卡片**必须**要求有壁纸**
+- 与 LSN-026 第 1 步的"独立成形参"配套：把判定拆成两个具名函数更好读——
+  `materialActiveWithWallpaper(forceOn, customBgUri)`（页面卡片）与
+  `materialActive(forceOn)`（弹窗卡片 / 浮动件）。
+- ⚠️ 常见错法：**页面卡片只判 API 可用性**（`materialActive(forceOn)`）——就是 026 那条根因的复发。
+  player 的三处页面卡片（`GlassCard` / `SettingsGroupCard` / `SettingsGroup`）**全部**都写
+  `customBgUri.length > 0 && materialAvailable()`；只有**弹窗内卡片**（压在 sheet 面板上）与
+  **浮动件**（背后恒有内容可采样）才只判 API。
+- 同一文件内两套门槛并存时**必须分成两个方法**并在注释里互相指路（`useMaterial()` /
+  `useActionMaterial()`），否则日后必被误换成一个。
+
+**口诀**：**"薄层不着色、无底就实色；页面卡要壁纸，弹窗卡不要"**
 
 ---
 
@@ -1276,6 +1324,184 @@ ForEach(v.rows, (r: KvRow) => { this.kvRow(r) },
      this place` + `Cannot find name 'b'`。**元凶在报错点之外** —— 用脚本扫「独占一行的 `}`」
      定位那个提前闭合处（本工程实证在 615 行），把成员移回结构体内即可，**别按报错逐条补**。
 - **口诀**：**"划选三层收敛（局部→行→字形），手势同源分流；跨页先问 has，符号先查 id_defined"**
+
+---
+
+### LSN-032 几何变换（`scale`/`rotate`/`translate`）挂在**内容层** ⇒ 命中热区收窄 ⇒ 「看得见、点不动」
+
+- **场景**：2026-10-02 Icey-Reader。做「书架卡片 → 阅读页一镜到底」转场时，
+  把整页（含正文）包在根容器里做变换 ⇒ 用户报「**进入阅读页 完全无法操作了 翻页 点击出操作啥的都不行**」。
+- **⚠️ 同一事故发生了两次，第二次更隐蔽**：
+  | 轮次 | 挂上去的修饰符 | 为什么第一次修完还复发 |
+  |---|---|---|
+  | 首次 | `scale(sx,sy) + translate(x,y)` | 修法只写明「内容层绝不能参与几何变换」，**举例只列了 scale/translate** |
+  | 复发 | `.rotate({ angle: -90, centerX: 0, centerY: '50%' })` | 作者以为"旋转只是动画"、不属于那两类 ⇒ **漏网**，同一 P0 原样复发 |
+  ⇒ **教训：铁律必须按「改变几何」这个本质来表述，不能按枚举具体 API 来表述** ——
+  凡改几何的修饰符（`scale` / `rotate` / `translate` / `rotate3D` / …）一视同仁。
+- **机理（数学闭合，不是猜测）**：ArkUI 的**命中测试按变换后的几何计算**。
+  - `scale 0.29` ⇒ 热区只剩原尺寸 29%（用户点屏幕中央，落在小块外 ⇒ 空命中）；
+  - `rotateY(-90°)` + `centerX: 0` ⇒ 该节点 **edge-on、投影宽 → 0 ⇒ 热区宽为 0 ⇒ 全页点不到**。
+- **⚠️ 为什么表现为「看得见、点不动」这种最难排查的组合拆解**：
+  `ReadPageComponent`（Reader Kit 内核）内部是 **`XComponent`**（native GPU surface）、
+  自绘内核是 **`Canvas`** —— 两者的画面都由 SDK 直绘，**不受 ArkUI 的 scale/rotate/translate 影响** ⇒
+  **正文照常满屏可见**，而**命中区已被缩/转没了**。恰好两条内核表现完全一致 ⇒
+  极易被误当成两个独立的 bug 去分别排查。
+- **判据（真机 hilog，决定性）**：
+  ```
+  W InputKeyFlow: ITK Id:761851, TTHNI:fId: 0        ← 命中链为空
+  W InputKeyFlow: Touch test result is empty.        ← 该次点击不落在任何组件上
+  ```
+  对照正常值：同机其它 App 是 `{ T: List, D: 36 };{ T: List, D: 56 };` —— **有节点才对**。
+- **✅ 结构性修法（让 bug 从根上不可能复现）**：
+  - 内容层（正文 / 菜单）**恒定 scale 1 / translate 0 / 零旋转**，与变换彻底解耦；
+  - 要「看起来像整页在动」，就**另起一层纯视觉层**：
+    ```ts
+    // 视觉层：满尺寸 + 自己承担几何动画 + 不吃交互
+    Column()
+      .width('100%').height('100%')
+      .backgroundColor(this.paperColor)        // 与内容层同源底色 ⇒ 起手零跳变
+      .opacity(this.paperOpacity)
+      .rotate({ x: 0, y: 1, z: 0, angle: this.flipDeg, centerX: 0, centerY: '50%' })
+      .animation({ duration: FLIP_DURATION_MS, curve: Curve.Friction })   // 纯属性动画
+      .hitTestBehavior(HitTestMode.None)       // ← 关键：点击必须落到内容层
+    ```
+  - 效果：即使该动画**一帧都没跑**，退化为**视觉瑕疵**（一块纸面没翻走），
+    **绝不是静默致瘫** —— 这是"结构性修法"与"调参数"的分水岭。
+  - 官方 `BookFlipLongTakeTransition` 正是这么做的（变换挂封面 `Image`，**从不包裹内容子树**）。
+- **⚠️ 纯视觉层的必备保险丝（连带的第二条）**：
+  若该视觉层是**满屏不透明**的（如"铺满的纸面"），它的"播完/翻走"就是**内容重新可见的唯一动作**。
+  一旦起手信号（布局回调 / 尺寸测量）不达 ⇒ **纸面永久盖住内容**（用户"什么都看不见"）。
+  ⇒ 摆上该层时**同时挂一根兜底定时器**（`setTimeout(() => play(), FALLBACK_MS)`，
+  `FALLBACK_MS` 取远大于正常信号延迟、又短到读不出卡顿的档，如 120ms），
+  到点无条件执行；两条路径共用同一个**幂等**入口（`if (played) return`）。
+  最坏情况由"永久遮挡"降级为"晚一拍翻走"。另在 `aboutToDisappear` 里 `clearTimeout`。
+- ⚠️ **`@Builder` 调用不可链式加属性**：`this.flightCover(x).scale(...)` 不合法，
+  属性必须写在 **builder 内部的根节点**上。
+- ⚠️ **第三次复发（2026-10-02，见 LSN-034 A）**：删干净几何变换后**仍然点不动** ——
+  根因换成了**包裹层**（对接 SDK 级重组件时，组件与页面根之间**每多一层容器都是一个独立变量**，
+  不论它是否参与变换）。⇒ 两条铁律要**同时**满足：**零变换**（本条）+ **零包裹层**（LSN-034）。
+  只做其中一条，症状会原样复发 —— 这正是「修了两次还点不动」的完整解释。
+- **口诀**：**"改几何的修饰符不碰内容层；要动就另起一层，加 None 加保险丝"**
+  （补充：**"对接 SDK 重组件时，包裹层本身也不能有 —— 视觉层也不行"**）
+
+---
+
+### LSN-033 `preferences` 的 string 上限 = **8192 字节** ⇒ 图片/长文本必须落沙箱文件
+
+- **场景**：2026-10-02 Icey-Reader。用户报「**自定义壁纸好像失效了**」。
+- **⚠️ 死因是官方硬约束，不是概率问题**：
+  > **`preferences` 的 Value 为 string 时长度不得超过 8192 字节**（UTF-8）
+  > 超长 `putSync` 直接抛 `Parameter error. The type of 'value' must be ValueType.`
+
+  而上一个实现把 **720w JPEG 的 base64 data URI** 直接 `putSync`：
+  `720w JPEG q80 ≈ 30~80 KB` → base64 膨胀 4/3 ⇒ **40~110 K 字符** ⇒ **必然超限**。
+- **⚠️ 极具欺骗性的表现（这是最坑的地方，别去翻显示链路）**：
+  | 时刻 | 现象 |
+  |---|---|
+  | 选完图**当次运行** | 内存态 + AppStorage 有值 ⇒ **壁纸显示完全正常**（"看起来能用"） |
+  | **重进 App** | `getSync` 读回空串 ⇒ 槽位空 ⇒ **壁纸消失** |
+
+  ⇒ 排查「X 失效 / 重启就没了」时，**第一步先确认值到底有没有存下来**（读回 + 看日志有没有
+  `putSync failed`），而不是去逐文件对比渲染层 —— 渲染层往往一点没坏。
+- **✅ 修法**：图片字节落**沙箱文件**，`preferences` 只留一行 `file://` URI（≈120 字节）。
+  ```ts
+  // 写：<filesDir>/bg/wallpaper_<slot>.jpg
+  const data: ArrayBuffer = await packer.packing(pm, { format: 'image/jpeg', quality: 80 });
+  // ⚠️ 必须带 TRUNC：新图比旧图小则不截断，会把上一次的尾部字节留在文件里 ⇒ JPEG 尾部垃圾
+  out = fileIo.openSync(filePath,
+    fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC);
+  fileIo.writeSync(out.fd, data);
+  // 存：官方 API，别手拼 'file://' + path（含空格/中文路径不稳，也不符合 file://bundleName/path）
+  const displayUri = fileUri.getUriFromPath(filePath);
+  ```
+  显示侧**零改动** —— `Image()` 与 `image.createImageSource()` 都直接吃 `file://` URI。
+  ⇒ 不需要 `FilePermission` 持久化，也不需要 `onForeground` 重新 activate（沙箱文件无外部权限依赖）。
+  清除时**先删文件、再清槽位**（顺序反了就只能靠约定路径兜底）。
+- **✅ 并加显式长度预检**（让这类问题不再静默）：
+  ```ts
+  if (typeof value === 'string' && value.length > MAX_PREF_STRING_BYTES /* 8192 */) {
+    AppLogger.error('SettingsManager',
+      `save(${key}) 值过长被拒：${value.length} 字符 —— preferences 放不下，应改落沙箱文件后只存路径`);
+    return;   // 写不进去的东西再 flush 也没用
+  }
+  ```
+- **铁律**：`preferences` 只放**轻量标量** —— 开关 / 档位 / 短字符串 / 路径 / `file://` URI。
+  **图片、长 JSON、二进制一律落沙箱文件**，只存路径。
+- ⚠️ **换实现时的代价要说清**：旧链路的字节在 catch 分支里就被丢弃了 ⇒
+  修复**无法恢复用户已设的那张图**，需让用户**重新选一次**（此后永久有效）。
+- **口诀**：**"preferences 只放标量，图长二进一律落文件"**
+
+---
+
+### LSN-034 SDK 级组件「点不动」的第三类根因 = **包裹层**；以及「无限 loading」的三条机制
+
+> 来源：2026-10-02 Icey-Reader 第十一轮。用户原话：
+> 「**还是点不动阅读页 我怀疑是不是全屏的问题导致的？要不还原下 然后就是 如果我短时间多次返回进入
+> 会出现一致显示正在排版的问题 请优化**」
+
+#### A. 「点不动」第三次复发 ⇒ 根因换成了**包裹层**（与 LSN-032 并列的第三条）
+
+- **排错的第一步是排除法，不是继续加保护层**：
+  | 假设 | 判据 | 结论 |
+  |---|---|---|
+  | 窗口级全屏导致 | `git show HEAD:` 里 `setWindowLayoutFullScreen(true)` + `SafeArea.set(...)` **本来就存在** | ❌ 排除（HEAD 时可交互） |
+  | 几何变换（LSN-032） | 已删干净，仍点不动 | ❌ 排除 |
+  | **包裹层** | HEAD 的结构是「组件**直挂**页面根 Stack」，改动后变成「组件 ← 容器 ← 自定义组件 ← 页面根」 | ✅ **真根因** |
+
+- **判据来源（写在项目里的对照实验结论，比任何推理都硬）**：
+  > SDK 的内部视图控制器（`readKitViewController`）**只在「系统组件直挂真·路由页的页面根 Stack」**
+  > 这种形态下可靠建立；放进 `NavDestination` → `readKitViewController is empty` → 整页白屏。
+  > 「刻意不套 `Navigation`，是为了**不重新引入『被包裹』这个变量**」。
+
+  ⇒ **推广成通用判据**：对接 SDK 级重组件（Reader Kit / Map / Camera / 各种 XComponent 类）时，
+  组件与页面根之间**每多一层容器都是一个独立变量**，且**不论该层是否参与几何变换**
+  （LSN-032 只管"变换"，本条管"层数"，两者会叠加成同一个症状 ⇒ 修了变换仍复发）。
+
+- **✅ 修法（用户口径「还原下」= 回到 HEAD 形态，而不是继续加层）**：
+  1. 内核 `build()` 一律 **`this.pageRoot()` 直挂**，删掉一切中间容器 / 自定义组件；
+  2. 需要状态栏避让时，**不给组件本体加 `padding`**（真机实证：padding 会让 SDK 的仿真翻页动画
+     在**组件内容盒内**合成，padding 区成硬裁切线、动画上下被裁切）
+     ⇒ 用 **`组件自身 height + 顶部 margin`**：
+     ```ts
+     ReadPageComponent({ ... })
+       .height(this.textH())            // '100% - <safeTop>vp'
+       .margin({ top: this.safeTop })   // ⚠️ margin 不计入自身高 ⇒ 真实高仍 == 上报 SDK 的 viewPortHeight
+     ```
+     两者**严格同源**（都是 `viewH - safeTop`），否则表现为「最后一行显示不全」；
+  3. 配 `Stack({ alignContent: Alignment.Top })`：默认 `Center` 会先垂直居中**再**被 margin 推下 ⇒ 底部溢出半屏；
+  4. `safeTop` 首帧为 0 属**安全方向**（只是暂时偏上，不裁内容），且它只 `0 → 真值`、不回退
+     （反方向才会"底部被切"）。
+
+- **⚠️ 撤掉视觉层后的必然收尾（容易漏）**：那种「一镜到底 / 飞行层」通常由**中继静态类 + 起手/消费两个端点**组成，
+  撤掉消费端点（组件）后，**起手端点还在写、另一个端点还在读**（如用它决定「是否关掉整页转场」）
+  ⇒ 变成「起了手但没人播动画 → 转场被关掉 → **硬切**」，比不做还差。
+  ⇒ 撤销必须**整条链路一起做**：调用点 + 判定点 + 中继文件 + 消费者组件，并用 `grep` 复核零引用后再删文件。
+  ⇒ 同时**核验"同名但不同机制"的另一个 id**别误删：本项目里 `heroIdOf`（`geometryTransition` 配对 id，
+  服务「书架→详情页」的**独立** hero，保留）与 `heroNodeIdOf`（组件 `.id()`，仅供 `getRectangleById`，
+  随通道撤除）是两回事 —— **删除前先 grep 出两条 id 各自的使用点逐个判定**。
+
+#### B. 「快速多次返回进入 → 永远显示正在排版」= 三条机制叠加
+
+| # | 机制 | 为什么 |
+|---|---|---|
+| 1 | **释放被延迟到转场之后 ⇒ 释放掉了新会话** | 退出时把 `release()` 排进 `setTimeout(..., 转场时长+60)`。而**SDK 控制器在新旧会话之间是同一个实例**（进程/组件级，非页面私有）⇒ 用户 ~50ms 内重进、新会话已 `start()`，旧页面在 T+420ms 才执行 `releaseBook()` ⇒ **从外部释放掉新会话** ⇒ `pageShow` 永不回调 ⇒ 无限 loading |
+| 2 | **`on(type, cb)` 是追加语义** | 重试 / 重进每次都 `on` ⇒ 叠加 N 层回调（处理函数跑 N 遍：重复计数、重复落盘、重复 load，**完全不报错**）|
+| 3 | **loading 只靠外部事件收起** | `pageShow` 是**外部事件**，可能永不到达 ⇒ 无超时出路就是永久 loading |
+
+- **✅ 修法**：
+  1. `release()` **立即执行**（释放 native 资源**不是耗时操作**，留在延迟批次换不来任何流畅度收益，
+     却制造真实竞态）；延迟批次只留**真正耗时的**（全库 JSON 序列化落盘 / 跨进程窗口调用 / 统计结账）；
+  2. 注册即替换 —— **先 `off(type)` 再 `on`**（官方 `off(type)` 省略 callback = 注销该类型**全部**回调）；
+  3. 加「等外部事件」**看门狗**，与「等组件挂载」看门狗**分开计时**：
+     | 门 | 管什么 | 档位 |
+     |---|---|---|
+     | `readyWatchdog` | 组件挂载前（回调不来） | 8s |
+     | `pageWatchdog` | `startPlay` 成功后的**外部**事件 | 6s（明显大于正常耗时、又短于前者）|
+     超时**强制收起 loading + 渲染可见错误态（带重试）**，绝不留在无限转圈；
+  4. 入口加**防重入守卫**（已启动过则先释放再重启），回调处理器加 `disposed` 守卫
+     （SDK 持有的注册可能在页面销毁后仍触发一次 ⇒ 会对已销毁组件写 `@State`）。
+
+- **口诀**：**"SDK 重组件直挂根，多一层就是变量；释放立刻、注册替换、等外部事件必须看门狗"**
 
 ---
 

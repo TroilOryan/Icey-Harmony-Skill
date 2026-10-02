@@ -110,6 +110,7 @@ import { promptAction, SymbolGlyphModifier, ComponentContent } from '@kit.ArkUI'
 | 弹窗改菜单 | 把底部 `AppSheet` 面板整体搬进下拉菜单时：菜单项**点击后自动关闭**，不需要手动 `closeMenu`；但「打开子页面/打开另一位面的浮层」要**先关菜单再触发**，否则两层蒙层叠加 |
 | 跨页触发浮层 | 菜单在 A 页（如 Index 标题栏），要操作的浮层组件挂在 B 页 → 用 `AppStorage.setOrCreate('drawerOpen', true)` + B 页 `@StorageLink` 双向绑定，**不要**去捞组件实例引用。⚠️ 若该浮层是「全屏覆盖」形态（抽屉/遮罩），**优先直接挂到根层**（跨树浮层 zIndex 不可比，挂业务页会被 Hds 标题栏/miniBar 压住，见技能 `harmony-side-drawer`）；此时回传上下文改用**时间戳广播** `AppStorage.setOrCreate('xxxRequest', Date.now())`，别用 boolean（`@Watch` 只在值变化时触发） |
 | 菜单项超长 | 9 档排序这类选择型内容**不要平铺**（菜单会超屏）→ 做成二级菜单，见上文「多级菜单」 |
+| 分割线不统一 | **`MenuItem.divider` 不设置时系统本就不画分割线**（`menu.d.ts` 原文："If this attribute is not set, the divider will not be displayed."）——所以"有的菜单有、有的没有"永远是自己手写 `.menuItemDivider({...})` 造成的分叉。用户定案（Icey 2026-10-02）：*"要么就全部不要"* → **全仓删掉 `.menuItemDivider()`，一律用系统默认（无分割线）**。⚠️ domain 无 `MenuAttribute.divider`，唯一控制点就是它；删完记得清掉随之无用的 `import { LengthMetrics } from '@kit.ArkUI'`（否则 lint 报未使用） |
 
 ## 接进现有脚手架（componentId 透传链）
 
@@ -217,8 +218,18 @@ function sortItem(param: MenuParam, label: string, mode: number) {
 
 ## 普通组件上的下拉菜单：`bindMenu` 直挂
 
-标题栏按钮**必须**走 openMenu（受控 bindMenu 不弹），但页面里的普通组件（空状态按钮、设置页按钮、
-列表行…）直接 `bindMenu` 更简单可靠：
+⚠️ **前置判据（2026-10-02 Icey 实证，先看这条）**：普通组件（非标题栏）**只有"菜单内容静态不变"时**才用
+`bindMenu` 直挂。**一旦需要二级菜单 / 需要"按当前状态重算并重弹"（如一级项显示当前档位），`bindMenu`
+不够用 —— 静态 `@Builder` 没有"状态变化重算重弹"的周期**，改命令式 `openMenu`，锚点用该组件的
+`.id(常量)`（`TargetInfo.id` 指向任意 `.id()` 组件，零手工坐标）。
+
+- 实例：Icey 歌词版「更多」按钮（普通 `Stack`）——原 `bindMenu` + `Placement.BottomRight`，用户反馈
+  「弹出位置没和按钮对齐」+「播放模式要照排序模式点进二级」⇒ 必须改 `openMenu`。
+- ⚠️ **对齐口径**：`Placement.BottomRight` = 菜单**右缘**对齐锚点右缘（菜单向左展开，与窄按钮只"右下角相切"）；
+  `Placement.Bottom` = 菜单**左缘**对齐锚点左缘。「和按钮对齐」通常要的是后者。
+- 命令式的一级/二级切换、`MENU_SWITCH_MS=240`、103302 防护全部同上文「多级菜单」节（同一套机制，与是不是标题栏无关）。
+
+以下为**无二级**的普通组件直挂写法：
 
 ```ets
 Text('导入音频')
@@ -242,5 +253,8 @@ Text('导入音频')
 ## 适用范围
 
 - Hds 标题栏（HdsNavigation/HdsNavDestination）menu icon 弹下拉——本项目场景。
-- 普通自定义组件上也可用 openMenu（TargetInfo.id 指向任意 `.id()` 组件），但组件自身挂 `bindMenu` 直挂模式更简单，优先直挂。
-- 样板代码：`entry/src/main/ets/pages/subPages/VipPage.ets`（buildMenuItems / openTitleBarMenu / vipTitleBarMenuBuilder）。
+- 普通自定义组件上也可用 openMenu（TargetInfo.id 指向任意 `.id()` 组件）；**需要二级菜单时这是唯一方案**，
+  内容静态不变时用 `bindMenu` 直挂更简单，优先直挂。
+- 样板代码：`entry/src/main/ets/pages/subPages/VipPage.ets`（buildMenuItems / openTitleBarMenu / vipTitleBarMenuBuilder）；
+  普通组件命令式二级菜单样板：`entry/src/main/ets/components/PlayBar/PlayHomePage.ets`（`openLyricMenu` / `goLyricMenu` /
+  `LyricMoreMenuParam` / 文件级 `lyricMoreMenuBuilder`）。

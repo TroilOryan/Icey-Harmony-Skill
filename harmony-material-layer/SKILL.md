@@ -88,6 +88,68 @@ SymbolGlyph($r('sys.symbol.local_fill'))
 - **挡位实时**：`ForEach([this.materialLevel], key = 'mlv-${lv}-...')` 强制销毁重建承载 Toggle——**systemMaterial 对同一节点换材质对象不重应用**，节点重建是唯一可靠手法（2026-09-15 实时重建失败的根因）。
 - 五条硬约束（少一条材质画不出来）：matchParent 尺寸 / borderRadius 与外壳一致 / backgroundColor 显式透明 / enabled+focusable+accessibilityLevel('no')+hitTestBehavior(None) / systemMaterial 放最后。
 - **兜底**（材质不可用/低版本）：`backgroundColor` 半透明 + `backgroundBlurStyle` 挡位与 scope 同口径同向（见第二节 blur 行）。
+- ⚠️ **卡片外壳上禁写 `width('100%')`**：百分比按父级**内容宽**解析、margin 在其外叠加 → 真宽 = 100% + margin，
+  横向溢出父级（父级居中时左右各溢一半）→ **左右 margin 全部失效、卡片贴死两边**。只写 margin，让内层
+  `.width('100%')` 撑到「父宽 − margin」。此坑与承载层无关，但改卡片时必踩。
+- **开关口径怎么选（别一刀切）**：材质 = "模糊背后内容"，所以**背后必须有东西可模糊**：
+  | 元素位置 | 开材质的门槛 |
+  |---|---|
+  | 压在图片/列表内容上（浮动按钮、胶囊、FAB） | `materialAvailable()`（API≥26）即开 |
+  | 压在纯色**页面背景**上的卡片（设置卡/歌单卡） | `customBgUri 非空 && materialAvailable()`——无壁纸时模糊纯色=看不出效果 |
+  | **弹窗内的卡片** | `materialAvailable()` 即开，**不要求壁纸**——弹窗面板本身已是 'sheet' 材质，卡片模糊的是面板 |
+- **⚠️ 卡片"颜色不对"的两条真根因（2026-10-02，用户：「卡片颜色我感觉也不大对」）**
+  > 症状：无壁纸时卡片比页面背景**灰一档**、拉不开层次；有壁纸时卡片发"奶白"、玻璃感被抹平。
+  > 两条都要修，只修一条症状仍在。
+
+  **① 薄层材质**不该**额外着色**（`materialColor` 必须是 `Color.Transparent`）
+  | 场景 | 正确 materialColor |
+  |---|---|
+  | `'sheet'`（弹窗**面板**，需要"压得住"） | 按挡位着色（`#6BFFFFFF` 等） |
+  | `'menu'` / `'search'` / `'system'`（**薄层**：卡片、菜单、芯片、浮动件） | **`Color.Transparent`** |
+  ⚠️ 反面教材：出口函数对**所有** scope 都喂 `materialColorFor(lv)`（浅色 = 42% 白）。
+  无壁纸时材质采样的是页面灰底 `#F2F3F5`，再叠 42% 白 ⇒ 卡片灰一档；
+  有壁纸时白纱盖住壁纸 ⇒ 玻璃感尽失。**挡位差异只由 `style` 表达**，着色不参与。
+  实测口径（player `SettingsManager`）：薄层走 `materialSystem()` —— `materialColor: Color.Transparent`；
+  仅 `materialFor(scope)` 那条路径着色。若自研出口只有一个函数，就用 `scope === 'sheet' ? 着色 : Transparent`。
+
+  **② 无壁纸时的兜底底色必须是 `cardBg` 实色**，不是半透明
+  | 状态 | backgroundColor | backgroundBlurStyle |
+  |---|---|---|
+  | 有壁纸 + 材质可用 | `Color.Transparent`（材质接管） | `NONE`（材质自带模糊，双层会发灰） |
+  | 有壁纸 + 材质不可用 | `Color.Transparent` | `COMPONENT_REGULAR` / `Thin`（透出壁纸） |
+  | **无壁纸**（不论材质可用与否） | **`colors.cardBg` 实色** | `NONE` |
+  ⚠️ 反面教材：无壁纸也返回半透明 `#B3F2F3F5` + `BlurStyle.Thin`。
+  半透明兜底是"毛玻璃时代"的写法（当时材质不可用一律配毛玻璃，必须半透明才透得出模糊）；
+  无壁纸时**既没有东西可透、又让卡片与页面糊在一起** ⇒ 读作"一块灰玻璃"而非卡片。
+  改为实色 `cardBg` 后与页面 `background` 天然拉一档，层次自明。
+- **两级玻璃层次（弹窗卡片）**：弹窗**面板**走宿主 `bindSheet/AppSheet` 的 `options.systemMaterial = materialFor('sheet')`；
+  卡片在其上再挂承载层用 **`scope='menu'`**。卡片若也上 `'sheet'` 会厚到近实色、看不出玻璃感。
+  同一宿主内两套门槛并存时（如页内卡片 + 弹窗卡片），**分成两个方法**（`materialOn()` / `sheetCardMaterialOn()`）
+  并在注释里互相指路，避免日后误换。
+- **弹窗内卡片的完整装配（`MediaActionSheet` 范式，2026-10-02）**：
+  ```
+  Stack() {
+    if (materialOn()) MaterialLayer({ layerRadius: 16, scope: 'menu', active: ... })
+    Row() { 封面 + 标题 + 副标题 }              // 内容必须在材质之上（材质不采样兄弟节点）
+      .backgroundColor(materialOn() ? Color.Transparent : cardBg)   // 材质接管时必须透明
+  }
+  .width('100%').borderRadius(16)
+  .margin({ top: 8, bottom: 16 })               // 上 8 让开标题带 / 下 16 分隔操作项（刻意不对称）
+  // ⚠️ 不设 .clip()：材质自带阴影，父级裁切会切掉
+  ```
+  上留白用 `margin` 而**不是**改弹窗全局的 `PANEL_PAD_V`（那是所有弹窗共用的口径）。
+- **⚠️ 跨仓移植色板：`surface` 字段两端语义不同（2026-10-02 实测踩坑）**
+  | 仓 | `surface` 语义 | `buttonBg` |
+  |---|---|---|
+  | player | **卡片色**（= `cardBg`） | 非 primary 按钮底（`#E7E8EA`） |
+  | reader | **非 primary 按钮底**（全部 27 处引用无一是卡片） | （原先没有） |
+  ⇒ 照搬 player 色板时，**必须按语义而非字段名移植**：把 reader 的 `surface` 对齐 player 的 `buttonBg`。
+  若错照 `surface`，所有非 primary 按钮会变成纯白、从"按钮"退化成"和卡片一样"。
+  正解：调用点全部改名为 `buttonBg`（语义直白），旧名留 `@deprecated` 同值兼容。
+- **⚠️ 去卡片化后，弹窗内的行分割线要一并删除（2026-10-02）**：
+  操作项列表与选择列表（`actionsView` / `playlistPickerView`）在 player 里都是**裸连排**
+  （只有 `height(48)`，无任何 `Divider`）。卡片时代为"卡片内行"加的分割线，去卡片化后
+  会读作**表格线**，且与"操作项 = 并列动作、不是数据行"的语义不符 ⇒ 行靠**留白**分段。
 
 ## 五、铁律：组件内读 AppStorage 不订阅 = 不实时
 
