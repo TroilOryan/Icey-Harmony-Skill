@@ -3,9 +3,7 @@
 
 # HarmonyOS 桌面卡片（Form Kit）开发与调试
 
-## 第一部分：铁律与判定口径
-
-# HarmonyOS 桌面服务卡片（Form Kit）开发要点
+> **第一部分：铁律与判定口径** ｜ 下面至下一个「第一部分/第二部分」标记之间的章节都属于本部分。
 
 ## 先分清卡片类型（决定一切限制）
 
@@ -89,15 +87,13 @@
 4. `FormLink` 的 `params` 是宿主能拿到的路由参数（如 `eventId`），宿主在 `onCreate/onNewWant`
    里从 `want.parameters` 取。
 
----
-
 ## 第二部分：三件套 / 数据注入 / 刷新 / 点击（实操清单）
 
-# HarmonyOS ArkTS 桌面卡片（Form）开发与刷新
+> 下面至文末的 7 节都属于本部分。
 
 适用：给 HarmonyOS（ArkTS/ETS，DevEco）应用加桌面卡片、加卡片模板、或修「数据变了卡片不更新」。
 
-## 一、卡片三件套（必须齐全）
+## 1. 卡片三件套（必须齐全）
 
 | 文件 | 作用 |
 |---|---|
@@ -108,18 +104,18 @@
 
 新增模板：form_config.json 加一条（`src` 指向新页面、`defaultDimension`/`supportDimensions` 写尺寸如 `4*4`），并在 `base/element/string.json` 加 `displayName`/`description` 字符串。**卡片页不需要进 main_pages.json。**
 
-## 二、尺寸语义
+## 2. 尺寸语义
 
 `2*2` / `2*4` / `4*4` = 桌面格子数，`2*4` 是**宽扁**卡（4 宽 × 2 高，横向排两列没问题），`4*4` 是近方形大卡。
 
-## 三、静态卡片数据注入（isDynamic: false）
+## 3. 静态卡片数据注入（isDynamic: false）
 
 - 卡片页面用 `@LocalStorageProp('key')` 承接字段；普通 `@State` 不参与 FormBindingData 映射。
 - 宿主推送：`formBindingData.createFormBindingData(payload)` + `formProvider.updateForm(formId, msg)`。
 - payload 必须是**显式类实例**（ArkTS `arkts-no-untyped-obj-literals`），字段只放 string/number/boolean。
 - 多条目（列表/网格）不要塞多个平行字段，塞**一个 JSON 字符串**（如 `list`），卡片侧用纯数据类 + `JSON.parse` 还原；解析类放在**零 Kit 依赖**的文件里（卡片对可调用 API 有白名单限制，别让卡片间接 import ArkData）。
 
-## 四、卡片不刷新（高频问题）——根因与正解
+## 4. 卡片不刷新（高频问题）——根因与正解
 
 卡片是**拉取式**渲染：数据落盘变了，卡片不会自己知道。三条刷新路径：
 
@@ -141,7 +137,7 @@
 
 排查：日志打 `desktop=<总数> pushed=<本应用数>`；若 pushed 恒 0 且桌面确有卡片 → 该接口没返回本应用卡片，退回持久化 formId（`onAddForm` 存、`onRemoveForm` 删）。
 
-## 七、卡片点击交互：静态卡片必须用 FormLink（高频坑）
+## 5. 卡片点击交互：静态卡片必须用 FormLink（高频坑）
 
 **铁律**：`isDynamic:false` 的静态卡片**不支持** `postCardAction` —— 写了 onClick + postCardAction 编译通过但**真机点了没任何反应**（静默无日志）。静态卡片只能用 **`FormLink`** 容器包裹触发事件；动态卡片才用 postCardAction，且动态卡片**反而不能用 FormLink**。
 
@@ -166,7 +162,7 @@ FormLink({
 - ⚠️ 页面 `aboutToAppear` **绝不能** `setOrCreate('信号键', 0/'')` 归零：`setOrCreate` 是覆盖写，会抹掉 Ability 在页面构造前写入的信号（冷启动永远跳不过去）；且 `@Watch` 不对初始值触发，必须在 `aboutToAppear` 主动补一次。
 - 冷启动时数据可能未恢复：跳转前做「重试到数据就绪」（如 200ms × 15）并在消费后清空信号，避免重复压栈。
 
-## 五、卡片组件能力坑
+## 6. 卡片组件能力坑
 
 - ✅ 支持：Row/Column/Stack/Text/Circle/Divider/Blank/List/ListItem/ForEach/image 等（含 @Builder、@LocalStorageProp）。
 - ❌ 不支持/不建议：`Grid`/`GridItem`（用 Row+Column+ForEach 自己分行）、左右滑动手势（与桌面分页冲突）、大图与复杂动画。
@@ -174,7 +170,7 @@ FormLink({
 - 静态卡片别用 `@State` 承接推送字段；`aboutToAppear` 只跑一次，**要随数据变化的列表在 build 里解析**（用 raw 字符串 + 缓存兜住重复 JSON.parse）。
 - 卡片根容器给 `borderRadius` + 深浅两套底（`#FFFFFF`/`#000000`），宫格用浅灰/深灰格底（`#F5F5F7`/`#1C1C1E`）区分层次。
 
-## 六、验证（本地 CI 式）
+## 7. 验证（本地 CI 式）
 
 ```bash
 export JAVA_HOME="/c/Program Files/Huawei/DevEco Studio/jbr"
