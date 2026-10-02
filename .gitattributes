@@ -1,0 +1,29 @@
+# 行尾规范化：仓库内一律存 LF，检出时按平台原生处理。
+#
+# 背景：本库大量文件是 Markdown / Python / ArkTS 模板，
+# 换设备时若某台机器 core.autocrlf=false、而编辑器又写 CRLF，
+# 就会出现「同一文件半 LF 半 CRLF」，届时 git diff 会膨胀到整文件级。
+# 显式声明 text=auto 可让所有机器口径一致（存储统一 LF）。
+#
+# 注：本次加入时仓库既有 blob 已全部是 LF，故不会产生重规范化改动。
+
+* text=auto
+
+# 二进制资源不参与行尾转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.hap binary
+*.so binary
+*.ttf binary
+
+# 文本类显式标注（便于以后排查）
+*.md   text
+*.py   text
+*.mjs  text
+*.ets  text
+*.ts   text
+*.json text
+*.json5 text
+*.txt  text
