@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <!-- VIP 会员金色实心皇冠（2026-09-09）：fill 直接烘成果金色 #E6A23C（ThemeManager.vipGold），
+       菜单/歌词长按菜单用 $r('app.media.crown_gold')，不受主题色与深浅色影响，恒金色实心。 -->
+  <polygon fill="#E6A23C"
+    points="2.6,8.4 6.4,13.2 9.4,10.4 12,15.6 14.6,10.4 17.6,13.2 21.4,8.4 19.8,17.4 4.2,17.4" />
+  <rect fill="#E6A23C" x="4.2" y="17.4" width="15.6" height="3" rx="1.2" />
+</svg>
