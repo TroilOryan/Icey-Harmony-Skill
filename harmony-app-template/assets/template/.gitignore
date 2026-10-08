@@ -15,6 +15,18 @@
 # p7b / cer / p12 / csr 是"工程可复现构建"的一部分，必须进仓库；
 # 整体忽略会导致新机器 clone 后编译不出可安装包、也无法复现签名问题（00303074）。
 #
-# 例外：material/ 是 hap-sign-tool 生成的哈希命名中间缓存，每次构建可重建，不版本化。
+# ⚠️ signing/<mode>/material/ **也必须入库**，它不是"可重建的构建缓存"！
+#   经 hvigor 源码 `hvigor-ohos-plugin/src/utils/decipher-util.js` 确认：
+#     fd/{0,1,2} 各 16B 密钥分量 + ac/ 16B salt + ce/ 48B AES-GCM 包裹的工作密钥
+#     三层经 pbkdf2(xor(fd0,fd1,fd2,固定常量), salt, 10000) 派生出 AES key，
+#     **用于解密 build-profile.json5 里的 storePassword / keyPassword 密文**。
+#   它由 DevEco IDE 首次配置签名时生成，CLI(hvigorw) 只有读取逻辑、不会重建，
+#   且与密文一一配对。三种失败模式对应三种报错：
+#     · material 目录**缺失**   -> 00308018 / ENOENT: no such file or directory
+#     · material **为空目录**   -> 00304032 "Signing materials ... is an empty directory"
+#     · material 与密文**不配对** -> 00303242 "unable to authenticate data"（AES-GCM 认证失败）
+#   参照 Icey-Player-Harmony（可正常打包上线）：其 `signing/debug/material/` 的 5 个
+#   文件全部入库，.gitignore 只忽略根级 /signing/material/。
+#
+# 仅忽略根级 material/（与 debug/material 用途不同，是另一套缓存）：
 /signing/material/
-/signing/debug/material/
