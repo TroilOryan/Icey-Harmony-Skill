@@ -174,6 +174,16 @@
   在卡的圆角外露出四个直角，读作「封面圆角了、但阴影衬托出矩形」（用户原话）。
   ⇒ **两处都要写 `borderRadius`**：内层裁内容 + **外层（挂 shadow 的那层）给形状**。
   排查：`grep -rn "\.shadow({" -B 6 entry/src/main/ets --include=*.ets`，逐处确认**同节点**有 `borderRadius`。
+- ⚠️⚠️ **父滚动容器默认 `CONTENT_ONLY` ⇒ 阴影在 padding 区被裁**（2026-10-08 第三处独立成因）：
+  官方文档原文：**「Grid、Scroll 的默认值为 `ContentClipMode.BOUNDARY`，List、WaterFlow 的
+  默认值为 `ContentClipMode.CONTENT_ONLY`」**，而 `CONTENT_ONLY = 0` 的定义是
+  **"Clip to content rect inside margin & padding"**（按**扣掉 padding 的内容区**裁剪）。
+  ⇒ `List` 挂了 `.padding({ left:16, right:16 })` 时，子项阴影向左右扩散的部分落在
+  **padding 区**⇒ **被裁掉**（症状：**只有左右被切平**，上下正常）。这与"父容器 padding 是
+  阴影落脚点"的直觉**相反** —— **空间存在 ≠ 可绘制**。
+  修法：`List().clipContent(ContentClipMode.BOUNDARY)`（= 裁到组件外框、**含 padding**、不含 margin）。
+  ⚠️ 至此「阴影被裁」共**三处独立成因，别合并记**：① 同节点 `clip(true)+shadow`；
+  ② shadow 节点无 `borderRadius`；③ 父滚动容器默认 `CONTENT_ONLY`。
 
 ### 10. ⚠️⚠️ `Tabs`/`HdsTabs` 的 `onChange` **在切换动画结束后**才触发（2026-10-08）
 

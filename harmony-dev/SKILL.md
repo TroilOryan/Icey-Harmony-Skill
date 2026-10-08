@@ -9,7 +9,7 @@ description: >-
   主题/深浅色/暗色模式/自定义背景/壁纸/毛玻璃/沉浸光感/材质/GlassCard/模糊；
   安全区/状态栏/全屏/挖孔/标题栏/侧滑抽屉/抽屉；图标/加个图标/sys.symbol/系统符号/SymbolGlyph；
   运行日志/AppLogger/清理埋点/诊断日志/更新日志；桌面卡片/服务卡片/widget/form/form_config/updateForm；
-  编译报错/10505001/arkts-no-any-unknown/编译不过/改了没生效/hvigor 报错/点不动/命中失灵/白屏/空屏/无限 loading/正在排版/残留模糊/列表不更新/LazyForEach不刷新/整块不渲染/阴影消失/阴影露出矩形/圆角外有阴影/编译通过但没反应/切tab不跟手/tab高亮滞后；
+  编译报错/10505001/arkts-no-any-unknown/编译不过/改了没生效/hvigor 报错/点不动/命中失灵/白屏/空屏/无限 loading/正在排版/残留模糊/列表不更新/LazyForEach不刷新/整块不渲染/阴影消失/阴影露出矩形/圆角外有阴影/阴影左右被裁/阴影被切/编译通过但没反应/切tab不跟手/tab高亮滞后；
   很卡/掉帧/跟手延迟/帧耗时/性能打点/Canvas 卡顿；阅读器/阅读页/Reader Kit；星图/Stellarium/HiPS/视野/fov/投影；
   截图取证/图层没画出来；二进制资产/索引越界/星表体检。
 agent_created: true
