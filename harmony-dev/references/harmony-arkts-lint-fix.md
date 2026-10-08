@@ -169,6 +169,36 @@
 - **修法**：需裁内容（图/渐变塞进圆角）→ **双层**（外层 Stack 做 size+borderRadius+shadow，内层 Stack 做 clip）；
   只想浮起 → 直接给外层容器加 `.shadow`，别在 clip 节点上加。
 - ⚠️ `shadow()` 的 `offsetX` 对整行轨道必须 0（右偏让左端无阴影、右端重，读作整体歪）。
+- ⚠️⚠️ **`.shadow` 的轮廓 = 它所在节点自身的形状**（2026-10-08 补）：圆角只写在内层
+  「裁图节点」上、`shadow` 挂在外层**没有 `borderRadius`** 的容器上 ⇒ 阴影按**直角矩形**画，
+  在卡的圆角外露出四个直角，读作「封面圆角了、但阴影衬托出矩形」（用户原话）。
+  ⇒ **两处都要写 `borderRadius`**：内层裁内容 + **外层（挂 shadow 的那层）给形状**。
+  排查：`grep -rn "\.shadow({" -B 6 entry/src/main/ets --include=*.ets`，逐处确认**同节点**有 `borderRadius`。
+
+### 10. ⚠️⚠️ `Tabs`/`HdsTabs` 的 `onChange` **在切换动画结束后**才触发（2026-10-08）
+
+**症状**：左右滑动切 tab **不跟手** —— 内容页已跟手到位，**底部 tabBar 高亮才切**
+（点击切换则读作"页面先过去、高亮过一会儿再亮"）。
+
+**根因**（SDK 文档明写）：`TabContent` 的高亮若读 `currentIndex`，而 `currentIndex`
+只在 `onChange` 更新，就必然滞后**整段动画时长**。
+
+| 回调 | 触发时机 |
+|---|---|
+| `onChange(index)` | 切换动画**结束后** |
+| `onAnimationStart(index, target)` | 动画**起手**（松手过阈值那一刻） |
+| `onSelected` / `onUnselected` | 动画起手（Hds **6.1.0(23)** 起，低 compatibility 会闪退） |
+| `onGestureSwipe` / `onContentDidScroll` | **逐帧** —— ⚠️ **HdsTabs 未透出**（仅标准 `Tabs` 有） |
+
+**判据**：同页标题栏正常（读的是 `onAnimationStart` 写的 `chromeIndex`）、**只有底部高亮滞后**
+⇒ 唯一差异就是读的索引不同。
+
+**修法**：**tabBar 选中态与标题栏同源，都读 `chromeIndex`**（由 `onAnimationStart` 在动画起手
+写 targetIndex）；`currentIndex` 只保留给受控 `index` 与 `onChange` 兜底。
+
+- ⚠️ **做不到"拖动中随位移渐变高亮"**：需要逐帧的 `onGestureSwipe`/`onContentDidScroll`，
+  HdsTabs 没透出。本修法把滞后收敛到**松手过阈值那一刻**，是 HdsTabs 上限。
+- 排查：`grep -rn "currentIndex ===" entry/src/main/ets --include=*.ets`（tabBar 高亮读它即错）。
 
 ### 9. ⚠️ `aboutToDisappear` **不只**在"主动退出"时触发（2026-10-07 语义陷阱）
 - 三种触发：① 用户主动返回（可预期）；② 进程被杀/崩溃（**不触发**）；③ **应用退到后台后系统回收该页面（照常触发）**。
