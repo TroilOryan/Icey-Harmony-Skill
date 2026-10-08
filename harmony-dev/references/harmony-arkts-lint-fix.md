@@ -99,6 +99,90 @@
   ⇒ 卡片页模块级常量**一律带卡片后缀**（`NUM_OFFSET_Y_1X2`），或把常量挪进组件内部。
   ⚠️ 这类错误**不在宿主文件里**，改"设置/宿主"需求时极易漏看 —— 收尾必须真跑一次构建。
 
+## 静默失效与命中排查（编译通过但运行不对）
+
+> 这类问题**编译零报错、日志无异常**，只能靠"看编译产物 + 按 zIndex/覆盖层列清单"定位。本工程（Icey-Reader）
+> 已各栽过一轮，结论固化如下。项目专属内容（双内核/导入管线/数据模型）不在此列，见其 `docs/`。
+
+### 1. 🔴 struct 内禁用 `get` 访问器（命中率最高，2026-10-06 实证）
+- **症状**：派生值取到 `undefined`（`fontSize(undefined)` ⇒ 整行/整块不渲染）/ 参与运算变 `NaN`
+  （`scrollToIndex(NaN)` ⇒ 动作静默失效，目录不定位、进度上报坏值）。
+- **根因**：ArkTS 把 `.ets` 编译成 `.ts` 时，**手写 `get` 访问器被整段丢弃**（@Prop 自动 getter 保留、
+  普通方法保留、手写 `get` 一个都不留）。
+- **修法**：派生值一律写**私有方法**（`this.xxx()`）或提前算进**普通成员**。
+- **历史中招**：`BookCover.cellSize/colCount/titleX/titleY`、`ReaderKitPage.tocIndex`（目录不定位）、
+  `ReaderPage.currentChapterIndex`（进度上报坏值）。
+- **自查**：`grep -rn "get [a-zA-Z_]" entry/src/main/ets --include=*.ets`（struct 内手写 getter 应无命中）。
+
+### 2. 🔴 自定义组件调用点的通用属性会生成合成节点 `__Common__`（吃命中）
+- **症状**：父组件里给组件内部节点设了 `HitTestMode.None`，那块仍吃点击；**只写了 `padding` 的留白带**
+  成了命中终点。
+- **根因**：`TtsSubtitle({...}).padding({bottom:96})` 编译后生成 `__Common__` 合成节点包住组件，
+  **合成节点无 hitTestBehavior 设置（默认 Default = 自身响应 + 阻止兄弟）** ⇒ 它的 padding 区也是命中区，
+  组件**内部**的 None 管不到调用点这一层。
+- **修法（两条缺一不可）**：① 不需要时**门控渲染**让该层根本不存在（`if (this.ttsOn)`）；
+  ② 调 `zIndex` 让该接收命中的层**排在被吃命中的层之上**。
+- **实例**：阅读页底栏 7 按钮全灭 —— 字幕层调用点 padding(96) 盖住底栏(88)，且字幕层 `zIndex(3)` > 菜单层 `zIndex(2)`。
+
+### 3. `hitTestBehavior` 语义（不递归）
+| 取值 | 自身 | 子节点 | 兄弟 |
+|---|---|---|---|
+| `Default` | 响应 | 响应 | **阻止** |
+| `Block` | 响应 | **阻止**（连同自己按钮） | 阻止（相对父容器） |
+| `Transparent` | 响应 | 响应 | 不阻止 |
+| `None` | 不响应 | 不响应 | 不阻止 |
+- `Block` 的"阻止兄弟"是**相对父容器** ⇒ 必须加在**整层**，只加小块无效。
+- `None` **不阻止任何一方** ⇒ 挡不住下层 native surface / 子节点。
+- 排查先问"命中停在哪个节点"（列全部整屏覆盖层含 `opacity 0`、按 zIndex 从高到低问）。
+
+### 4. 🔴 `LazyForEach` 列表"整表刷新"只有一条真路（`.key()` 不是重建原语）
+- **症状**：数据层全对（`@Watch` 触发、`books` 换了新数组），**屏幕条目数/内容不变**；
+  空列表导入第一本会立刻显示、已有书再导入就不显示。
+- **根因**：`.key('epoch_'+n)` 是**测试专用标识**（`@test`，编译器 WARN `key' can only be used for testing directories`），
+  对渲染**零影响**。能真正销毁子树的原语只有 **`if` 的分支号** 和 **`ForEach` 的 key**。
+- **正解**：外层套 `if (this.dataEpoch % 2 === 0) { A } else { A }`（两分支逐字同内容 ⇒ 分支号翻转即销毁重建，
+  抽 `@Builder` 就不销毁了）；行内刷新用 `ForEach([\`k_${tick}\`], …)`（但 `Refresh` 只能一个子组件，包不住整个 List）。
+- **数据源实例必须稳定**：`LazyForEach(source, …)` 创建时把监听器注册在**当时对象**上；
+  `this.source = new Xxx()` 后旧实例仍被攥着 ⇒ 新书永远不出现、`notifyRowOf` 打空。
+  ⇒ 实例建一次，用 `setRows()` 就地换数据。
+- **别重建太勤**：打开书→`markRead`→阅读次数+1 这类不影响行结构的，无条件重建会**每次返回列表跳回顶部**
+  ⇒ 用行签名（每行 key 拼起来）当判据，签名变才重建。
+
+### 5. 带参 `@Builder` 根节点事件归属不确定
+- **表现**：给带参 `@Builder` 的根节点挂 `onClick` ⇒ **点不动、无日志**。
+- **口径**：**带参 `@Builder` 不挂事件，抽成 `@Component`**（组件边界 = 事件边界）。
+  `layoutWeight(1)` 这类布局属性也必须挂在组件自己根节点、写在调用处无效。
+
+### 6. 🔴 离屏截图 `getComponentSnapshot().get(id)` 被父容器 `height('100%')` 截断
+- 父容器 `.height('100%')` 会把**自适应高度**的离屏子节点**截断到整屏高** ⇒ 长内容拦腰截断。
+  承载容器必须显式给足高度（上界用「字数×行高」证明）。
+- `.id()` **不要写在自定义组件调用点**（落到 `__Common__` 合成节点，截到的是容器）；透传进组件、打在**组件自己根节点**上。
+- 渐隐/覆盖遮罩用**负 margin 叠**（占位高 0），别用 `height('100%')` 覆盖层（百分比按父级约束解析成"最大高度"把卡片撑爆）。
+
+### 7. ⚠️ `fileIo.accessSync(path)` 返回 **boolean**（不存在返回 `false`，**不抛异常**）
+- "不存在就建目录"不能写 `try { accessSync } catch { mkdirSync }`（catch 永不执行）⇒ 随后 `openSync` 报 `13900002`。
+  ⇒ 直接 `mkdirSync` + 吞掉"已存在"异常。
+
+### 8. 🔴 `clip(true)` 与 `.shadow()` 写在同一个节点 = 阴影被裁（2026-10-07 结构性发现）
+- `clip(true)` 把自己节点的绘制（**含向外扩散的阴影**）一起裁掉 ⇒ 同节点写 `clip+shadow` 等于**没有阴影**。
+- **为什么长期没发现**：旧阴影右下偏移被裁掉的是左上、右下仍露大半，读作"有效阴影"。改成无偏移/居中时才暴露。
+- **修法**：需裁内容（图/渐变塞进圆角）→ **双层**（外层 Stack 做 size+borderRadius+shadow，内层 Stack 做 clip）；
+  只想浮起 → 直接给外层容器加 `.shadow`，别在 clip 节点上加。
+- ⚠️ `shadow()` 的 `offsetX` 对整行轨道必须 0（右偏让左端无阴影、右端重，读作整体歪）。
+
+### 9. ⚠️ `aboutToDisappear` **不只**在"主动退出"时触发（2026-10-07 语义陷阱）
+- 三种触发：① 用户主动返回（可预期）；② 进程被杀/崩溃（**不触发**）；③ **应用退到后台后系统回收该页面（照常触发）**。
+- **后果**：任何靠"`aboutToDisappear`=用户主动离开"的判据**偶发失效**（用户说"有时候…"）。
+- **修法**：读 `AppStorage('appInBackground')` 区分前后台 + 在"主动退出唯一入口"处显式再做一次
+  （两道独立防线，任一条失效另一条仍正确；取不到键按保守方向——该做没做是破坏性的，多做一次通常不是）。
+
+### 排查 SOP（点不动 / 不生效先看）
+1. 列全部整屏覆盖层（含 `opacity 0`）。按 `zIndex` 从高到低问"它吃不吃这一下"。
+2. `grep -rn "hitTestBehavior\|\.zIndex(" entry/src/main/ets --include=*.ets`。
+3. 看编译产物真实节点：`<module>/build/default/cache/default/default@CompileArkTS/esmodule/debug/entry/src/main/ets/**/*.ts`
+   （`__Common__` 合成节点、被丢弃的 getter 都在这里现形）。
+4. 改完**真机复验**（命中类"看着对"和"点得动"是两回事，已因此白改过两轮）。
+
 ## 编译验证：本机有 CLI，别靠猜（2026-09-16 补齐）
 
 **hvigorw 在 DevEco 安装目录里，项目根通常没有 wrapper**：
