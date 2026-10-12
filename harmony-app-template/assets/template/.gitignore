@@ -11,22 +11,25 @@
 **/.test
 /.appanalyzer
 
-# ===== 签名文件：**不忽略，随仓库版本化**（务必不要写成 `signing/`）=====
-# p7b / cer / p12 / csr 是"工程可复现构建"的一部分，必须进仓库；
-# 整体忽略会导致新机器 clone 后编译不出可安装包、也无法复现签名问题（00303074）。
+# ===== 签名文件：**分两半**（务必不要写成裸 `signing/`）=====
+# ① p7b / cer / p12 / csr **进仓库**：它们是"工程可复现构建"的一部分，
+#    让新机器 clone 后能用**同一份证书**构建出可安装包、也能复现签名类问题（00303074）。
+#    整体忽略会导致仓库里一个签名文件都没有、clone 后构建不出可安装包。
 #
-# ⚠️ signing/<mode>/material/ **也必须入库**，它不是"可重建的构建缓存"！
-#   经 hvigor 源码 `hvigor-ohos-plugin/src/utils/decipher-util.js` 确认：
-#     fd/{0,1,2} 各 16B 密钥分量 + ac/ 16B salt + ce/ 48B AES-GCM 包裹的工作密钥
-#     三层经 pbkdf2(xor(fd0,fd1,fd2,固定常量), salt, 10000) 派生出 AES key，
-#     **用于解密 build-profile.json5 里的 storePassword / keyPassword 密文**。
-#   它由 DevEco IDE 首次配置签名时生成，CLI(hvigorw) 只有读取逻辑、不会重建，
-#   且与密文一一配对。三种失败模式对应三种报错：
-#     · material 目录**缺失**   -> 00308018 / ENOENT: no such file or directory
-#     · material **为空目录**   -> 00304032 "Signing materials ... is an empty directory"
-#     · material 与密文**不配对** -> 00303242 "unable to authenticate data"（AES-GCM 认证失败）
-#   参照 Icey-Player-Harmony（可正常打包上线）：其 `signing/debug/material/` 的 5 个
-#   文件全部入库，.gitignore 只忽略根级 /signing/material/。
+# ② material/ 与 build-profile.json5 的密码密文 **各设备本地、都不提交**：
+#    signing/<mode>/material/ 是解密 build-profile.json5 里 storePassword/keyPassword
+#    密文的密钥材料（fd/{0,1,2} 各 16B 密钥分量 + ac/ 16B salt + ce/ 48B AES-GCM
+#    包裹的工作密钥，经 pbkdf2(xor(fd0,fd1,fd2,固定常量), salt, 10000) 派生 AES key）。
+#    由 DevEco IDE 首次配置签名时生成、CLI(hvigorw) 只读不重建、且与密文**一一配对**。
+#    ★ 正因为"IDE 生成 + 一一配对" ⇒ 每台设备各自生成、**互不通用**：
+#      A 机的 material 解不开 B 机的密文；提交它们 = 把某设备的密钥塞进共享仓库，
+#      另一台 pull 下来必然报错（三种失败模式）：
+#        · material 目录**缺失**   -> 00308018 / ENOENT: no such file or directory
+#        · material **为空目录**   -> 00304032 "Signing materials ... is an empty directory"
+#        · material 与密文**不配对** -> 00303242 "unable to authenticate data"（AES-GCM 认证失败）
+#    ⇒ 换机后若签名报错，正解是**在本机重新配一次签名**（重新生成 p12+p7b+csr，
+#      material 与密文在本机成对新生），而不是从别处拷 material 进来。
 #
-# 仅忽略根级 material/（与 debug/material 用途不同，是另一套缓存）：
+# 参照 Icey-Reader：仓库里只有 p7b/cer/p12/csr，material/ 与密码密文不进仓库。
 /signing/material/
+/signing/debug/material/

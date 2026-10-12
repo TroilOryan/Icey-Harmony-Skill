@@ -8,8 +8,8 @@
 ```
 assets/template/
 ├── .gitignore                      # 排除 node_modules/oh_modules/build/.hvigor/.idea 等；
-│                                   # ⚠️ 签名目录**只忽略根级 /signing/material/**；
-│                                   #    p7b/cer/p12/csr 与 <mode>/material/ 都必须进仓库（LSN-029，2026-10-08 更正）
+│                                   # ⚠️ 签名分两半：p7b/cer/p12/csr **进仓库**；
+│                                   #    material/ 与密码密文**各设备本地、不提交**（LSN-029，2026-10-12 定案）
 ├── README.md                       # 模板自身文档（铁律原文 122 条，SKILL.md 是其纲要）
 ├── build-profile.json5             # targetSdk 26 / compatibleSdkVersion 6.1.0(23)
 ├── hvigorfile.ts
