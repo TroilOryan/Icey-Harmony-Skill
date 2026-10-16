@@ -197,6 +197,105 @@ SymbolGlyph($r('sys.symbol.local_fill'))
 
 **正解**：主 nav 的 title bar **显式关掉 scroll effect + 透明掩码**（`scrollEffectOpts: { enableScrollEffect: false }`），所有 tab 共用同一构造器；确需顶部模糊就自己画组件级 `backgroundBlurStyle`。子页保留滚动模糊时，注意 maskExtraHeight 会把模糊带向内容方向下延（本项目 28vp），首卡留白必须扣掉这段，否则"被标题栏模糊区域覆盖"。
 
+## 八之二、⚠️⚠️ 通用属性 `systemMaterial` **只在标题栏区域生效**（2026-10-03 实证，E/读者项目）
+
+**现象**：把搜索框/工具条直接放进**内容区**（`Column`/`List`/`Grid` 里），挂上
+`.systemMaterial(...)` 后**什么都不变** —— 不报错、不警告，日志只留一行：
+
+```
+Material inactive: out of scope
+```
+
+**根因**：通用属性 `systemMaterial` 的官方生效范围是 **Navigation / NavDestination 的标题栏区域**
+（`titleBar` 及其扩展位）。放在普通内容节点上 ⇒ 落出 scope ⇒ **材质从未被应用**。
+
+**正解（二选一）**：
+
+1. **把控件上提到标题栏扩展位**（首选，本工程读者搜索页 / player 媒体库搜索框都是这条路）：
+   Hds 从 **6.0.0(20)** 起支持 `HdsNavigationTitleBarOptions.content.bottomBuilder`
+   ```ts
+   opts.content.bottomBuilder = { builder: this.mySearchBar, height: 56 };
+   ```
+   官方对该扩展位的描述就是「标题栏底部区域增加搜索框、页签」。
+   ⚠️ **高度必须与"内容区首个留空项"同源**：标题栏整体增高了这么多，内容区首个留空的
+   高度要一并加上，否则首项被标题栏盖住（少算）或多出一段空白（多算）。
+   ⚠️ 自研脚手架（如 `SubPageScaffold`）要转出 `titleBottomBuilder` + `titleBottomHeight`
+   两个成员（**不能加第二个 `@BuilderParam`** —— 尾随闭包要求有且仅有一个）。
+
+2. **用 `Toggle` 承载层绕过**（内容区就地生效，见第四节 `MaterialCardLayer`）
+   —— 五条属性缺一条就安静不画，见第十一节清单。
+
+**排查口诀**：材质"完全没反应" → 先 grep 日志里有没有 `out of scope`，
+有就是**放错位置**（不是参数错、不是挡位错、不是平台不支持）。
+
+---
+
+## 八之三、⚠️⚠️ 小尺寸浮动件（封面角标）**别用系统材质** —— 用 `backdropBlur`（2026-10-11 血泪，15+ 轮）
+
+**症状**：封面角标（时长/进度徽标）"跨页面观感不统一"，而且**换任何参数都不变** ——
+`scope` 从 `'system'` 换 `'menu'`、`fixed` 开关、`fixedStyle` 各档、`backgroundBlurStyle` 各档、
+`colorMode` 强深色、加/不加垫底……用户实测「**和之前一样的观感，肯定是你的叠加方式有问题**」。
+
+**根因（机制级，一句话）**：上面**所有**方案走的都是**系统材质**那一条路 ——
+而系统材质**自带系统底色**，其底色由**页面 / 挡位 / 背后像素**共同决定：
+- `systemMaterial`（`ImmersiveMaterial`）：`materialColor` 恒 `Color.Transparent`，底色全交给系统；
+- `backgroundBlurStyle(style, options)`：SDK 原文 = **"组件背景（系统材质）"** —— 同样自带系统底色；
+  `colorMode` 只改"材质按深/浅渲染"，**不是**"让文字与底对应"的开关。
+⇒ **参数换了、机制没换**，所以观感永远一样。这不是调参能解决的。
+
+**正解 = 纯高斯模糊 `backdropBlur`**（SDK 语义："模糊**组件背后**的内容，组件自身内容保持清晰"），
+它**不引入任何系统材质底色**：
+
+```ets
+Stack() { Text(this.text) /* padding 挂内容上 */ }
+  .borderRadius(10)
+  .backdropBlur(12)                       // ★ 纯高斯模糊（观感主旋钮：太小看不出、太大糊成一块）
+  .backgroundColor(this.themeIsDark ? '#54000000' : '#54FFFFFF')  // 与文字色配对的 scrim
+  .clip(true)
+  .position({ right: 6, bottom: 6 })
+```
+- **文字色必须与 scrim 成对**：浅色主题 = 白 scrim + **深字**；深色主题 = 黑 scrim + **白字**。
+  用户原话：「注意要背景和文字的颜色要对应 不能浅色底加浅色文字」。
+  配对由**主题**决定 ⇒ 与页面/封面/挡位**无关** ⇒ 跨页面天然统一（这正是"统一"的实现方式）。
+- 不判壁纸、不看挡位、不用 `MaterialLayer` ⇒ 首帧即终态，无"先正确后变实心"跳变。
+- ⚠️ **条纹对比**（三档都试过再下结论）：
+  | API | 模糊对象 | 是否带系统底色 |
+  |---|---|---|
+  | `blur(v)` | 组件**自身**（内容+背景都糊） | 无 |
+  | `backdropBlur(v)` | 组件**背后**的内容 | **无** ← 角标/浮条要的就是它 |
+  | `backgroundBlurStyle(s)` | 组件背景（**系统材质**） | **有**（观感随页面变） |
+  | `backgroundEffect(o)` | 组件背景（自定义材质） | 半自定义，仍走材质体系 |
+
+**判据口诀**：需要「浮在**任意内容**之上、观感必须**尺寸×跨页面恒定**」的小件（角标/胶囊/浮条）
+⇒ **`backdropBlur` + 主题配对 scrim**。
+需要「跟系统设计语言一致的卡片/菜单材质」⇒ 才走 `MaterialLayer` / `backgroundBlurStyle`。
+
+### 八之三·补：观感"跨页面不统一"时的**二分诊断法**（2026-10-11 用户提的，强制先用）
+
+反复调参救不了这类问题 —— 它可能是**两个完全不同**的成因，必须先用一次实验切开：
+
+> **"你就单纯用一个同样带透明度的纯色背景我看看效果，如果还是不统一，肯定就有问题。"**
+
+改 `backgroundColor('#8C000000')` + 去掉一切模糊/材质（**一个色值、四个调用点复用**），然后看：
+
+| 结果 | 结论 | 下一步 |
+|---|---|---|
+| **一致了** | 变量在**采样类效果**（`backdropBlur` / `systemMaterial`）—— 它们要访问"背后内容的渲染缓冲"，而 **Tab 页（HdsTabs 内容区）与子页（HdsNavDestination 内容区）的渲染上下文不同** ⇒ 同代码采到不同东西（同 `systemMaterial` 在子页静默失效的现象） | 要么接受（改用纯色/高不透明度），要么提高 scrim 不透明度让背景影响降到最小 |
+| **仍不一致** | 问题在**祖先容器**（谁改了 opacity / 叠了背景 / 不同的 clip 层） | 停止调徽标参数，**去查调用链** |
+
+⚠️ 配套发现：**不同封面尺寸的裁切不同 ⇒ 采样到的平均色天然不同**。
+`ImageFit.Cover` 下 140×80（≈16:9，显示整图）与 96×60（1.6，裁掉上下、更居中偏暗）
+同一张封面给出的"背后像素"并不一样 —— 角标位置又在角落，差异被放大。
+⇒ "小件 + 透明 + 采样背景"这个组合，**数学上就不保证跨尺寸统一**；
+要恒定就必须把背景的影响压到最低（提高 scrim 不透明度 / 退化为纯色）。
+
+⚠️ **ArkTS 属性链里不能插 `if`**：`.backdropBlur(...)` 想在开/关之间切换时，
+写 `if (cond) { .backdropBlur(v) }` 会报 `Declaration or statement expected` +
+`Cannot find name 'backdropBlur'`。**用条件值代替条件块**：
+`.backdropBlur(ON ? 12 : 0)`（SDK 明文：半径 **0 = 不模糊**）。
+
+---
+
 ## 九、材质浮层的位置与过渡（FAB + 面板）
 
 **根因**：`Column` 顺序布局 + `if (showPanel)`——面板收起时把 FAB 往上顶。

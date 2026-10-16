@@ -1,0 +1,114 @@
+# 应用内「友情应用」页接入清单（2026-10-16，Icey-Reader 实测全流程）
+
+> 适用场景：Icey 系（或任意同作者多应用）要在应用内做「我们制作的其他应用」推荐页，
+> 每张卡 = 宣传横幅图 + 应用名 + 「点击查看>>」+ 一句话简介，整卡可点跳转。
+> 参考实现：Icey-Reader `pages/subPages/FriendAppsPage.ets`（本册沉淀时的完整可用版）。
+
+## 1. 版式（对齐成熟竞品友应用页，已真机复验）
+
+```
+[标题省略——不要"我们制作的其他应用"标题区，直接进卡片列表（用户定案）]
+
+┌─────────────────────────┐
+│   横幅宣传图 180vp 圆角12  │  ← Image Cover 裁切；素材未提供 = 占位横幅
+└─────────────────────────┘
+ 应用名(17 Bold)    点击查看>>
+ 一句话简介(13 次级色)
+└ 下一张卡 ┘
+```
+
+- 横幅高度 **180vp**、圆角 12、`ImageFit.Cover`；
+- 「点击查看>>」= accent 色 13 号 Medium——它是**整卡点击**的入口文案（参考竞品语义）；
+- **整卡 `onClick`**，不是只给按钮挂点击。
+
+## 2. ⚠️ 卡片宽度铁律（溢出返工的根因，Icey-Reader 真机实锤）
+
+**横向留白挂外层 `ListItem.padding({left:16,right:16})`；卡片自身 `width('100%')`。**
+
+❌ 卡片 `width('100%')` + `margin({left:16,right:16})` ⇒ 总宽 = 100% + 32vp ⇒ **超出屏幕**。
+（ArkUI `width` 是 border-box 语义：padding 在尺寸内层安全，margin 叠在外面必溢出。
+`SettingsGroupCard` 头注释同一条铁律——写卡片组件前先看仓里同类组件。）
+
+## 2.5 ⚠️ 用户定案（2026-10-16）：清单与跳转规则
+
+- **「接友情应用」的固定含义**：把 **Icey Player / 冰沙阅读 / 星空下** 这三个里
+  **除自己之外的全部接入**（做哪个应用就排除哪个）。后续要增加应用用户会再说。
+- **全部走市场直达**（`store://appgallery.huawei.com/app/detail?id=<bundle>`）：
+  不管上没上架都直接换 id 配上——**上没上架不用管**（"这几个应用是确认上了"只是告知
+  优先级，不是接不接的判据）。bundle 名对照：
+  `com.icey.player`（Icey Player）/ `com.icey.reader`(冰沙阅读) / `com.icey.stars`(星空下)。
+
+## 3. 跳转通道（三类，按目标应用是否可直达选）
+
+### 3.1 已上架 AppGallery ⇒ 市场详情页直达（首选）
+
+```ets
+const want: Want = {
+  action: 'ohos.want.action.appdetail',
+  uri: `store://appgallery.huawei.com/app/detail?id=${bundleName}`,
+};
+ctx.startAbility(want);
+```
+- ⚠️ id **不带 C 前缀**（旧兼容写法会跳错/空白页，player 2026-09-08 实测修正）；
+- 真机实测通过：`com.icey.player`（270 评分 5.0 星详情页完整打开）、`com.icey.stars` 同理——
+  **同一条通路换 id 即用**。
+- 照抄实现：player `Index.onShareApp`。
+
+### 3.2 未上架（自建仓库/暂存）⇒ 外跳浏览器
+
+```ets
+ctx.startAbility({ action: 'ohos.want.action.viewData', uri: 'https://github.com/...' });
+```
+- 只保证"拉起浏览器"，页面级导航不承诺。
+
+### 3.3 华为主题商店等**内购资源**（不在应用市场）⇒ 只能走分享 https 链接
+
+- ❌ `aa start -U 'theme://…'` / `hwt://…` / 注入 want 参数（`--ps hitopId xxx`）：
+  **全部只落商店首页**（两轮真机实测，商店不消费外部 uri/参数——它的详情页路由
+  `hitopId` 是内部跳转专用）；
+- ✅ 唯一通路 = **应用详情页分享二维码里的 https 链接**，浏览器打开 → web 落地页 →
+  H5 侧"在应用中打开"拉起商店详情页（App Linking，商店自己声明并消费）；
+- 判据通用化：**第三方应用有没有页面级深链，`bm dump -n <bundle>` 看 skills 声明
+  + 真机发一条 uri 验证**。不消费 ⇒ 只能走"分享链接/浏览器"路线。
+
+## 4. 数据结构（直接抄）
+
+```ets
+class FriendApp {
+  name: string;        // 显示名
+  desc: string;        // 一句话简介
+  marketId: string;    // 市场直达（空串 = 未上架走 webLink）—— 二选一
+  webLink: string;     // 外跳浏览器链接
+  banner: Resource | null;  // 横幅图；null = 占位横幅（品牌底色+应用名+敬请期待）
+}
+```
+加新应用 = 加一条 + 拷一张横幅图进 `resources/base/media/`，页面自动渲染。
+
+## 4.5 入口在设置分组里的顺序（用户定案）
+
+「友情应用」放「**关于**」的**前面一个**（浏览/推荐类入口先于"版本信息"这类收尾入口）。
+ Icey-Reader 实际顺序：藏书库 → 阅读设置 → 界面 → 阅读统计 → **友情应用** → 关于。
+
+## 5. ⚠️ 新子页接线清单（白屏返工根因——两处映射表必须同改）
+
+`AppRouter` 加路由常量后，**漏掉任何一处都会白屏/静默不弹**：
+
+| 注册点 | 作用 | 漏掉的后果 |
+|---|---|---|
+| `Index.navDestinationBuilder` 分支 | 全局栈（设置页等正常入口）路由名→组件 | **`load page failed: xxx`，页面空白**（最常见主因） |
+| `SubPageRouterHost.dispatch` 分支 | 阅读页存活时的旁路分发 | 从阅读页入口进去空白 |
+| `ROUTES_ABOVE_READER`（按需） | 需要盖在阅读页上的子页 | 入口在阅读页内时点击无效 |
+| `main_pages.json`（仅 @Entry 路由页） | 真·路由页形态 | 404 |
+
+排查指纹：hilog `AceNavigation: load page failed: <name>` ⇒ builder 缺分支。
+
+## 6. 联调命令（真机验证跳转）
+
+```bash
+hdc shell bm dump -n <bundle>        # 查 ability 真名 + skills 声明（scheme/action/host）
+hdc shell aa start -b <bundle> -a <ability> -U '<scheme>://<host>/<path>?k=v'   # 显式
+hdc shell aa start -U '<uri>' -A <action>                                        # 隐式（action 必须与声明一致）
+hdc shell aa start -b <bundle> -a <ability> --ps <key> <value>                   # want 参数注入
+```
+- 隐式失败 `10103101` = action 不匹配；`10104001` = ability 名错（先 dump 查真名）；
+- "拉起成功但落首页" = 目标应用不消费 uri 参数 ⇒ 该应用无页面级深链，改走分享链接/浏览器。
