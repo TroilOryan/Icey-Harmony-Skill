@@ -1,7 +1,7 @@
 > **分册：`harmony-app-template` 主册** ｜ 原独立技能 `harmony-app-template`，2026-10-03 合并进 `harmony-dev`。
 > 配套：`references/harmony-app-template/file-map.md`（文件职责表）、`references/harmony-app-template/workflows.md`（W1~W8 可复制代码）、`../assets/template/`（可移植模板工程副本）。
 
-# 鸿蒙 App 模板基建 v1.3.9
+# 鸿蒙 App 模板基建 v1.3.11
 
 > 📦 **本 Skill 自带模板工程副本**（`../assets/template/`，79 文件 / 1.2MB）——
 > 整个 Skill 目录拷到任何机器都能直接起新鸿蒙 App，不依赖外部工程。
@@ -123,10 +123,17 @@
 | **05** | 页面根 Column 用 `height('100%')` | 在 Hds TabContent 内**溢出约 50vp** | 用 `.layoutWeight(1)` |
 | **06** | `layoutWeight(1)` + `justifyContent(SpaceBetween)` 联用 | 子项高度异常、内容离屏 | 二者禁止同用 |
 | **07** | 顶部留白硬编码 `112` | 换机型/折叠屏错位 | `Row() {}.height(SafeArea.top + 72)`（状态栏 + MINI 标题栏 56 + 16）。⚠️ **2026-10-01 修正：`+64` 已废弃**——因为 `maskExtraHeight: 28` 的滚动模糊带下缘是 `56 + 28 = 84vp`，`72` 才让内容出带；**且首卡必须自带 `margin-top: 12`**，否则卡顶停在 72、仍压在模糊带里（读作「卡片贴着标题栏、没有间距」）。见铁律 **14b** |
-| **07b** | 子页（`HdsNavDestination`）与 tab 主页留白「同值却仍不等」 | 反复调 `SafeArea.top + N` 永远调不平 ⇒ 用户反复报「子页离顶部更小」 | **两侧留白必须同源且同值**（都是 `SafeArea.top + 72`）；**唯一可调项是骨架上的容器补偿**：`SubPageScaffold` 的 `height('calc(100% + 10vp)')` + `margin({ top: -10 })`（成对出现，`embedded` 宽屏右栏无 NavDestination 壳 ⇒ 保持 `0` / `'100%'`）。⚠️ 若两侧留白已同值、补偿也已对齐 player，**仍能看出差值就不要再动这个数**——那是 Hds 运行时对 `NavDestination` 内容区的实际下移量，静态反解不了，正确做法是两侧首内容节点各打 `onAreaChange` **量 y** |
+| **07b** | 子页（`HdsNavDestination`）与 tab 主页留白「同值却仍不等」 | 反复调 `SafeArea.top + N` 永远调不平 ⇒ 用户反复报「离顶部不统一」 | ⚠️ **先分清用户要的是哪一种「统一」**：<br>（a）**和参考工程统一**（原话「还是没和 player 统一啊」）→ 逐条抄对方**对应页面**的数字，**不要自创一个让两侧相等的数**；<br>（b）两侧彼此相等 → 那条路历史上连续改错 4 轮，**不要走**。<br><br>**2026-10-04 定案（Icey-Reader，口径 a；本口径以后为准）**：<br>| 侧 | 参考工程（`Icey-Player-Harmony`）代码 | 对方首卡顶 | 本工程落位 |<br>|---|---|---|---|<br>| 设置主页（tab，不走骨架） | `List({ space: 0 })` + `Blank(SafeArea.top + 72)`，卡自带 `top: 0`、间距靠卡内 `margin bottom: 16` | **72** | `List space → 0`；信息卡补 `margin bottom: 16` ⇒ **72** |<br>| 设置子页（走骨架） | `Blank(SafeArea.top + 72)` + 骨架 `margin top: -10` + 卡自带 `top`（2026-10-06 起为 **16**） | 当时 **74**（`top:12`）；现首卡顶 +4 | 骨架恢复 `-10` + `height 'calc(100% + 10vp)'`（成对） ⇒ **74** |<br><br>对方自己就是「72 vs 74」（差 2vp，观感不可辨）—— **抄这个差，不要去消灭它**。<br><br>❗**「两个工程不同构」是曾经用错的反驳理由**：曾以「本工程 `HdsNavDestination` 多写了 `.ignoreLayoutSafeArea([0],[0])`」为由把骨架补偿归零；实查 player `components/SubPageScaffold:138` **写着完全相同的一行**（+ `.titleMode(100)`）。⇒ **容器属性要逐项 diff 后再下不同构的结论**；两侧 `Stack/Column` 结构 + `HdsNavDestination` 属性全同、唯一差异就是那个常数时，**照抄就是最正确的做法**。见铁律 **14c** |
 | **08** | 内容顶部加固定空白 Column 做避让 | 内容被滚动模糊带压住 | List **视口顶到屏幕顶**，留白放**第一个 ListItem**，内容自然滑进模糊带 |
 | **09** | List 尾部不预留 | `barOverlap` 悬浮底栏遮住最后几项 | 末 ListItem `Blank().height(SafeArea.bottom + 80)`（子页 +40） |
 | **10** | 卡片用 `width('100%')` 同时又给 margin | 溢出 → 边距不生效 | 左右间距交给**父容器 ListItem padding** 或 GlassCard 自带 margin |
+| **10b** | **动态高度/宽度写「裸算式」**：`.height('100% - 38vp')`（无 `calc()` 包裹） | ⚠️ **P0**：官方行为是「**异常值时 `height` 恢复到不配置时的默认行为**」⇒ 高度**塌回内容高度**（不是撑满）。**若该层是 `XComponent`（SDK 直绘 GPU surface）⇒ 画面照常满屏可见、命中测试按节点几何算 ⇒ 热区为 0** = 「**看得见、点不动、翻不了页**」这个最难排查的组合 | 一律 `calc()` 包裹：`.height('calc(100% - 38vp)')`（运算符两侧留空格，API 10+）。**凡动态算式全项目统一 `calc(...)`**；模板合规样板 `SubPageScaffold` 的 `'calc(100% + 10vp)'`。⚠️ 排查「点不动」时**先查长度算式合法性**——这个组合已在阅读页（`ReadPageComponent`）连爆三轮同症状、第三轮才是本根因 |
+| **10c** | **对齐另一个工程的「顶部留白」时，直接抄它的 Blank 值** | 恒偏一个说不清的常数（本工程 reader 首页抄 player 会差 **44**）——因为对方的 Blank 里含**它自己的**结构补差（player `MediaLibrary` 的 44 = 「空第 1 行 + 标题行」，reader 标题栏是纯文字 MINI 栏，没有那两行） | **对齐目标必须是「首个内容块顶的绝对值」而不是 Blank 值**。先算清对方的**目标值**（player 注释原文：`目标首卡顶 = SafeArea.top + 128`），再反推本工程 Blank = `128 − 首个内容块自带 margin`。⚠️ 写成**两个常量相加**（如 `HOME_TOP_BLANK_VP = 116` → 注释成 `72 标题栏 + 44 锚点间距`），让"补差项"在代码里看得见，不许塌成魔法数 |
+| **10d** | **列表类不给 `fadingEdge` / 弹簧** | 上下边缘硬切割（内容在视口边缘"一刀切"），滚动到底无回弹——与项目其它列表**两套手感** | 列表统一口径：`.edgeEffect(EdgeEffect.Spring)` + `.fadingEdge(true, { fadingEdgeLength: LengthMetrics.vp(24) })`（`LengthMetrics` 从 `@kit.ArkUI` 导入）。⚠️ `fadingEdge` **只在内容溢出可视区时**才有渲染；内容不满屏时它「没效果」是**正常**的，不要误判成没生效。⛔ **例外：被「渐变模糊」压住的那类列表不要挂 `fadingEdge`** —— 它与 `linearGradientBlur` 会**双重淡出**，且 `fadingEdge` 是**上下两端同时渐隐**（用户往往只要求顶部）。⚠️ 但用户说「列表要能滚到标题下面」时，**先查的不是 fadingEdge，而是顶部留白放在哪**：写在**内容层 padding** 上 = 属于内容 ⇒ 吃掉同样多的滚动行程 ⇒ 内容最多滚到留白下沿，标题带那一片永远是空的。正解见 **10f** |
+| **10e** | 分段控件 / 标签自绘一套、页面里另一套 | 同 App 内**两套视觉语言**（用户会逐项指出"和首页那个不统一"） | **口径唯一化**：分段控件直接用页面内既有的胶囊 tag 语言。样板参数（本工程 reader）：`34 高 / borderRadius 17 / fontSize 14 / padding {left:16,right:16,top:7,bottom:7}`，未选态挂 `MaterialCardLayer({ layerRadius: 17, layerShadow: false, scope: 'menu' })`，选中态 `colors.accent` 实色，材质不可用回落 `colors.buttonBg` |
+| **10f** | 整页列表要「内容能滚到标题栏下面 / 被标题带渐变糊住」 | 顶部留白写在**内容层 padding**（外面包一层 `Scroll` 时更常见）⇒ 留白算进内容高 ⇒ 滚动行程白丢那么多 ⇒ 标题下永远空虚；或用了 `backdropBlur` ⇒ **均匀**模糊、带边界强度**突变** ⇒ 一条硬切割边 | **两件事都要做**：<br>① **留白改成滚动容器的第一个 item**（`ListItem() { Row() {}.height(topBlank()) }`）——item 能被完整滚出视野，天然可滚进标题带；用模板 `SheetContainer` 时同时传 `contentScroll: false` + `contentTopPad: false`。⚠️ 此后所有 `scrollToIndex` 下标 **+1**。<br>② 渐变模糊用 `linearGradientBlur`（**前景**模糊，糊组件自身内容 ⇒ 无硬边），**带长 = 该页顶部静止留白**（整页列表不能沿用弹窗 `blurBandVp` 的反推值，后者隐含「静止留白只有 64vp」）。Icey-Reader 已把该换算导出为 `SheetContainer.blurStopsForBand(bandVp, componentHeight)`。<br>③ 顺带：横向留白从**内容层**下放到**行**（列表必须全宽，模糊才能满幅铺开）。 |
+| **11** | 设置页「主页」与「子页」各写一套分组卡片组件，间距/内边距各填各的 | 用户在两个页面之间来回切换时肉眼能看出**卡片间距不一样、内边距也不一样**（主页更宽 / 子页更紧），但每处单看都「合理」⇒ 极难自查出来 | **两套组件的间距口径必须逐项对齐，只允许「对齐自己那侧文字列」的一处例外**：<br>① **卡间距**统一 `16vp`（主页用 `margin({bottom:16})`；子页用 `margin({top:16})` + 无 bottom，两者都靠「后一张卡的 top」隔开 ⇒ **子页千万不要既没bottom 又把 top 写小**，那是间距变小的唯一来源）；<br>② **卡片内边距**统一恒定值（如 `padding({top:6, bottom:6, left:1, right:1})`）——❌ 禁按「有无标题 / 有无图标」分档（如有标题 3/3、无标题 6/6）⇒ **带标题的那种卡会比另一种紧 3vp**，用户看到的正是这一处；标题行自带 `padding`，不依赖卡片顶部留白定位；<br>③ **唯一允许不同**：Divider 左缩进。主页项带图标 32vp ⇒ `margin({left:52, right:8})`（12+32+8 对齐图标后的文字列）；子页项无图标 ⇒ `margin({left:12})`。**两侧各自对齐自己那侧的文字列，不是 bug。**<br>⚠️ **排查姿势**：页面里搜不到这些数值（都封在组件里）⇒ **下钻到组件定义**`grep -rn "SettingsGroup" --include=*.ets` 对比两个组件的 `margin/padding/Divider` 三处，差异一眼可见。参考实现 `Icey-Player-Harmony/components/SettingsGroup`（主页口径基准）与 `components/SettingsGroupCard`（子页，向主页看齐）。见 **LSN-037** |
+| **12** | 给 SDK **高级组件**（`SegmentButton` / `Select` / 相对布局类）传「先组装好的变长数组」当参数 | ⚠️ **P0 真机闪退**（编译绿、必崩）：`TypeError: Cannot read property icon of undefined` → 进程被杀。这类组件的形参常是**定长元组**（SDK 原文 `ItemRestriction<T> = [T, T, T?, T?, T?]`），SDK 内部会**逐元素读字段**（如 `item.icon`）⇒ 塞了 `undefined` 就崩 | **必须按实际个数构造元组**（分段 2~5 项 ⇒ 写 `buildOptions2/3/4/5` 各自 `buttons: [a, b]` …），**不要**「补齐到 N 个元素再传」。<br>⚠️ 也别写 `as SegmentButtonItemTuple` —— 那是**三路联合类型**，断言会报 `Type 'A' is not assignable to type 'B'`；**直接传元组字面量**，让 ArkTS 自己选支。<br>⚠️ 另：`SegmentButton` **不支持通用属性**（`.width/.height/.margin/.padding` 全无效、不报错），高度唯一旋钮 = `buttonPadding`，间距只能父容器给；`onItemClicked` / `enableStateAnimation` 是**构造参数**（链式写报 `does not exist on type 'void'`）。见 **LSN-038** |
 
 ### 标题栏渐变模糊（**四处配套，缺一不可**）
 
@@ -136,8 +143,8 @@
 | **12** | HdsNavigation / SubPageScaffold | `.ignoreLayoutSafeArea([0], [0])`（SYSTEM=0/TOP=0） | 状态栏后面是一条白/黑带 |
 | **13** | 根 Stack | `.expandSafeArea([SYSTEM],[TOP,BOTTOM])` + `.backgroundColor(ThemeManager.colors.background)` | 顶部露出裸白条 |
 | **14** | 滚动蒙层高度 | `maskExtraHeight: 28`（内容短的页调小） | 模糊带盖住卡片顶部 |
-| **14b** | 顶部留白给了、首卡却**无自带 `margin-top`** | 卡顶正好落在模糊带内（`SafeArea.top+72` ＜ 带下缘 `84`）→ 用户报「卡片和顶部的距离明显不大对」 | **留白 + 首卡间距两件事**：`Row() {}.height(SafeArea.top + 72)` **且**首卡 `margin-top: 12`（卡片组件默认就带，别改成 0）。参考实现 `Icey-Player-Harmony`：`GlassCard` / `SettingsGroupCard` 恒带 `margin: { left:16, right:16, top:12 }` |
-| **14c** | 拿「看起来自洽的常数」反解容器偏移（如"子页低 22vp ⇒ margin 取 -22"） | **伪造推导**：用户在错误状态下仍说不统一 ⇒ 该常数被证伪，白改一轮 | 只在**有真机量测证据**时才引入非零补偿；否则一律取已被真机验证过的 player 值（`-10` / `calc(100% + 10vp)`）。判据：**同源同值 + 补偿对齐 player** 之后仍有差值 ⇒ 停止调 margin，改量 y |
+| **14b** | 顶部留白给了、首卡却**无自带 `margin-top`** | 卡顶正好落在模糊带内（`SafeArea.top+72` ＜ 带下缘 `84`）→ 用户报「卡片和顶部的距离明显不大对」 | **留白 + 首卡间距两件事**：`Row() {}.height(SafeArea.top + 72)` **且**首卡 `margin-top: 12`（卡片组件默认就带，别改成 0）。参考实现 `Icey-Player-Harmony`：`GlassCard` 恒带 `margin: { left:16, right:16, top:12 }`；⚠️ **2026-10-06 起设置子页的 `SettingsGroupCard` 已由 `top:12` 改为 `top:16`**（与设置主页 `SettingsGroup` 的 `margin bottom:16` 对齐，见铁律 **11** / LSN-037）⇒ **通用卡（GlassCard）与设置卡（SettingsGroupCard）的卡间距现在故意不同**：通用卡 12 是既有观感，不要为了「统一」去动它 |
+| **14c** | 拿「看起来自洽的常数」反解容器偏移（如"子页低 22vp ⇒ margin 取 -22"） | **伪造推导**：用户在错误状态下仍说不统一 ⇒ 该常数被证伪，白改一轮 | **先算清楚两侧的完整公式，再动**。留白公式 = `Blank(safeAreaTop + 72)` + **首卡自带 `top`** + **骨架 margin 补偿**：<br>子页 = `72 + 12 + (骨架 margin)`；tab 页 = `72 + (List space)`。<br>⚠️ **2026-10-04 修正（推翻同日的补偿归零）**：先分清口径 —— 用户说「**和 player 统一**」时，目标是**逐条抄参考工程对应页面的数字**，不是让两侧相等。对方自己就是 72（主页）/ 74（子页）；本工程照抄同一对数字即可（`SettingsTab space → 0` + 卡自带 `margin bottom: 16` ⇒ 72；骨架 `margin top → -10` + `height 'calc(100% + 10vp)'` ⇒ 74）。<br>**「两侧必须相等」是一条会反复走错的路**（本工程连改 4 轮）；一旦用户口径是「和 X 统一」，就**只有一个依据：X 对应页面写的是多少**。<br>引入非零补偿的**前置动作**：先把两边的容器属性（`ignoreLayoutSafeArea` / `titleMode` / `Stack-Column` 层级）**逐项 diff**，确认确实不同构才允许不抄；不同构的结论必须有 diff 输出为证。仍不足 ⇒ 停止调 margin，改在两侧首内容节点打 `onAreaChange` **量 y** |
 
 > 记忆口诀：**标题栏避让 + 组件 ignore + 根节点 expand + 内容留白** = 四处配套。
 
@@ -267,6 +274,9 @@
 | 给 UI 加图标 | 自研 SVG 图标组件 + `resources/base/media/*.svg` + 名字常量表（`SFIcon` 那套：要维护几十个 SVG、要分 normal/fill 两套、还无法随系统字体缩放） | **直接用官方符号**：`SymbolGlyph($r('sys.symbol.xxx')).fontSize(22).fontColor([color])`。选名查 `id_defined.json` 的 `"type": "symbol"`（本机 4042 个）；选中态用配对 `xxx` / `xxx_fill`。⚠️ `$r()` 只能写字面量，通用组件要接 `Resource`（见 LSN-020） |
 | 写 `compatibleSdkVersion` / `targetSdkVersion` | 一律写 `"6.1.1(24)"` 或一律写 `"26.0.0"` —— **两种写法各有适用区间，写错直接构建失败** | **按 API 级别分界**：API < 26 用旧式 `x.y.z(api)`（如 `"6.1.1(24)"`）；**API ≥ 26 用点分制 `major.minor.patch`（如 `"26.0.0"`）**。给 26 加 `(26)` 报 `00308018`；26 之前不写 `(api)` 报 `00306042`（见 LSN-021） |
 | 升级 SDK 版本 | 只改 `compatibleSdkVersion`（或只改 `targetSdkVersion`）就以为完事 | **两个字段一起改**，并保证 `compatibleSdkVersion ≤ targetSdkVersion ≤ compileSdkVersion`。改半截（如 compatible 改 26、target 还留 24）→ IDE sync 报 **`00303015 Configuration Error`**。⚠️ 该错误 **CLI 构建可能不报**（`compileSdkVersion` 由 IDE 解析的 SDK 决定）⇒ **`--sync` 与 `assembleHap` 必须各验一次**（见 LSN-021） |
+| 给**内容区**的搜索框 / 工具条加沉浸光感 | 直接给内容区节点挂 `.systemMaterial(...)`（搜索框放在 `Column`/`List` 里）→ **材质完全不生效**，不报错不警告，日志只一行 `Material inactive: out of scope` | 通用属性 `systemMaterial` **只在 Navigation/NavDestination 标题栏区域生效**。正解：① **上提到标题栏扩展位** —— Hds 6.0.0(20)+ 的 `titleBar.content.bottomBuilder = { builder, height }`（⚠️ 该 `height` 必须与"内容区首个留空项"同源相加，否则首项被盖）；② 内容区就地生效用 `Toggle` 承载层（`MaterialCardLayer`，见上表光感行）。**排查口诀：材质"完全没反应"先 grep 日志有没有 `out of scope` —— 有就是放错位置**（见 `harmony-material-layer.md` §八之二） |
+| 列表类给「上下边缘渐隐 + 弹簧」 | 只给 `List` 加 `.edgeEffect(...)` 忘了 `fadingEdge`，或反向漏一个 → 与项目其它列表两套手感 | 两条**成对**：`.edgeEffect(EdgeEffect.Spring)` + `.fadingEdge(true, { fadingEdgeLength: LengthMetrics.vp(24) })`（`LengthMetrics` from `@kit.ArkUI`）。⚠️ `fadingEdge` **只在内容溢出可视区时**渲染，内容不满屏时"看着没效果"是正常的 |
+| 对齐另一个工程的页面顶部留白 | 直接抄对方 `Blank` 的值（如抄 player 的 `SafeArea.top + 44 + 56`）→ 恒偏一个说不清的常数（本工程 reader 首页会差 **44**） | 对齐**绝对目标值**而不是 Blank 值：先读对方注释里的目标（player `目标首卡顶 = SafeArea.top + 128`），再反推本工程 `Blank = 128 − 内容块自带 margin`。⚠️ 对方 Blank 里含着**它自己的结构补差**（那 44 = player"空第 1 行 + 标题行"），本工程标题栏是纯文字 MINI 栏、没有那两行 ⇒ 照抄必偏。写成两常量相加（`72 + 44`）让补差项在代码里看得见（见铁律 10c） |
 | 给卡片加沉浸光感 | 直接给卡片 `.backgroundBlurStyle(Thin)` 或给外壳 `backgroundColor` 设材质 | 卡片外壳 = `Stack{ MaterialCardLayer + Column{内容} }`（模板 `components/MaterialCard`）。**承载层只能用 `ToggleType.Button`**（Checkbox 未适配；Switch 只覆盖开关本体），五条属性缺一不可：`LayoutPolicy.matchParent`（百分比会顶大卡片）/ borderRadius 同外壳 / `backgroundColor(Transparent)` / `enabled(false)+focusable(false)+accessibilityLevel('no')+hitTestBehavior(None)` / `attributeModifier` 放链**末**。应用级前置 `module.json5` metadata `ohos.arkui.UIMaterial.state="enable"`（模板已自带，改后须重装）。⚠️ 材质**不报错不失效提示**，必须真机截图验证（见 LSN-022） |
 | 光感材质画出来了但不刷新/不显示 | ① `attributeModifier` 写成内联对象字面量（拨开关后已画卡片不更新）② 外壳/承载层有**不透明底色**（材质层级在 backgroundColor 之下，被盖住）③ `interactive:true` 配**空 `lightEffect:{}`**（材质完全不渲染）④ `bindSheet` 不设透明底（默认白底整块盖住） | ① modifier 写成**方法调用**并读订阅变量；② 材质开时底色一律 `Color.Transparent`，关闭时回实色；③ 无流光色时**省略** lightEffect 字段；④ `bindSheet(..., { backgroundColor: Color.Transparent })`。材质不可用时降级：**半透明底色 + `backgroundBlurStyle(Thin)`**，缺半透明底色则模糊被盖住（见 LSN-022） |
 | 加自定义壁纸（选图作背景） | ① `result.uris`（**PhotoSelectResult 没有 uris 字段**，直接编译报错）② 对象字面量不标类型（`arkts-no-untyped-obj-literals`）③ 改了壁纸但重启后背景变回不透明 | 正确写法：`const opts: photoAccessHelper.PhotoSelectOptions = {...}`（显式类型）→ `result.photoUris[0]`（字段名 **photoUris**，class 定义在 openharmony 侧 `@ohos.file.photoAccessHelper.d.ts`）→ `SettingsManager.setCustomBgUri(uri)` 联动 `ThemeManager.setCustomBg`。picker 返回的 URI **自带永久授权**（persist 仅保险）。⚠️ **三处链路必须重放壁纸状态**：App 启动 / `onConfigurationUpdate`（updateFromConfig 重算 colors 会打回不透明）/ 设置变更（见 LSN-023） |
@@ -281,7 +291,11 @@
 | 同一组件既要「点击」又要「长按」（如列表卡：点击看详情 / 长按编辑） | `.onClick(...)` + `.gesture(LongPressGesture(...))` **并存**（两个独立手势）：长按命中后抬手**又触发点击** ⇒ 连跳两页（进编辑页又跳详情页）。编译全绿、只有真机暴露 | 绑成**互斥手势组**：`.gesture(GestureGroup(GestureMode.Exclusive, LongPressGesture({duration:500}).onAction(...), TapGesture({count:1}).onAction(...)))` —— 独占模式"先满足条件者胜出"。❌ 不要 `GestureMode.Parallel`（两个都触发）（见 LSN-028） |
 | 子页需要「外部数据变更后自动刷新」（编辑保存返回详情要显示新值） | 把重算结果放**普通字段缓存**、在 `build()` 里读 ⇒ 刷新链尾段是"父组件重渲染**会不会顺带重跑 `@Builder`**"这一**不确定行为** ⇒ 返回后仍是旧值、退出重进才对 | 用 **`@State` 持有视图模型 + `@Watch` 驱动重算**（`@Watch` 写在状态装饰器**之前**，LSN-012）；入参**只取 id、不持快照**，页面永远 `repo.find(id)`，取到 `null` 渲染「记录不存在」兜底卡（见 LSN-028） |
 | `ForEach` 里的数值变了但界面不更新（编辑后明细行还显示旧值） | key 只写"身份"：`(r) => \`kv_${r.label}\`` ⇒ 项还在、值变了 ⇒ **key 不变 ⇒ 复用既有节点、不重跑 `@Builder`** | key 里**带上会变的值**：`\`kv_${r.label}_${r.value}_${r.accent}_${r.isLast}\``。同理列表页 key 带上 `_${this.assetsVersion}` 做双保险（见 LSN-028） |
-| 新建工程/写 `.gitignore` 或把工程推上 Git | 照抄模板 `.gitignore` 的裸 `signing/` ⇒ **整个签名目录被忽略**，仓库里没有 p7b/cer/p12/csr；`git status` 里永远看不到，clone 到新机器构建不出可安装包（`unsigned.hap` / `9568320 no signature file`） | **签名材料必须进仓库**：只忽略 `/signing/material/` + `/signing/debug/material/`（hap-sign-tool 哈希缓存，可重建）。⚠️ 两条都要写（只写前者会漏掉 debug 下的 material）；⚠️ `git check-ignore` 判目录不可信，用 `git ls-files \| grep material` 复核（见 LSN-029） |
+| 数据层改的是**同一个对象引用**（`Repo.find(id)` 返回的实例 `in-place` 改字段），页面 `@State` 存了它 | `this.pinned = repo.find(id).pinned` 之后再 `repo.toggle(id)`、然后想让界面跟着变 ⇒ **`@State` 重新赋的是同一个引用 ⇒ 判定"引用未变"⇒ 不重渲染**（值其实已经变了，界面却是旧的）。且**编译全绿、无告警**，只有真机/运行才暴露 | **跨"数据层 in-place 改字段"的桥一律用值类型 `@State` 快照**（`@State pinned: boolean` / `@State curChapter: number`），**绝不 `@State book: Book` 存引用**；改完数据层立刻**回读并赋快照**（`const b = repo.find(id); this.snap = b !== null ? b.field : 默认`）。★ 同类指纹 = 书签/进度/置顶这些"内存态翻转"字段不刷新 |
+| 需要判断"刚刚那次操作前是什么状态"（如置顶后提示文案） | `repo.toggle(id)` 是 **in-place 翻转**，而调用方持有的 `actionTarget` 与 `find()` 返回**同一引用** ⇒ toggle 之后读 `actionTarget.pinned` 拿到的是**新值** ⇒ 刚置顶却提示「已取消置顶」（**文案与动作相反**，用户会报「显示反了」） | **翻转前把旧值存下来**：`const wasPinned = target.pinned; repo.toggle(id); toast(wasPinned ? '已取消置顶' : '已置顶')`。⚠️ 同一页面里"读新值"与"读旧值"两种写法都能自洽，但**必须只选一种并写注释说明**，混用必错 |
+| 要做「**上次退出时在哪，下次打开回到哪**」（阅读记忆 / 会话恢复） | 想用"记录时间戳 + 启动时判断是否够新"来区分"用户主动退出"与"进程被杀" —— 阈值怎么定都不对，且要额外的标志位与清理逻辑 | ⭐ **不需要任何时间戳/标志位：用「`aboutToDisappear` 在进程被杀时不执行」这个事实本身做判据。** 进页 `set(key, id)`、离页 `set(key, '')`；进程被杀 ⇒ 离页回调没跑 ⇒ 键**残留** ⇒ 下次启动正好命中"上次在页内"；用户自己返回 ⇒ 键已清 ⇒ 停在原位。★ **写/清必须在同一层成对**（写在 `@Entry` 宿主页的 appear/disappear，别跨层）<br>⚠️ 两个必须加的**硬闸**：① 恢复前判**数据仓已就绪**（未就绪时 `repo.find()` 恒 `null` ⇒ 会把有效会话**误判成已删除并清掉**，不可逆地毁掉自己的能力）；② 延迟恢复的窗口内**复检是否已在目标页**（用户可能已自己点进去了 ⇒ 无脑再进 = 开两份）。<br>⚠️ 恢复触发**要两路**（`@Watch('dataLoaded')` + `aboutToAppear` 尾部延迟），因为启动恢复可能在页面挂载**之前**就打完了标记 ⇒ **`@Watch` 对初始值不触发**、收不到那次变化（见铁律 35 / LSN-012） |
+| 撤掉一条"一镜到底 / 共享元素"通道时，机制要不要一起删 | 全删 ⇒ 下次要在**另一条路径**复用（用户原话「从列表到详情不用转场了，**从详情到阅读页才需要**」）时得重建整套曲线 / 置位 / DOM 配对机制；不删又怕留死代码被误用 | **分层决策**：① 先看新路径是否**具备落地条件** —— 若与已实证的硬约束冲突（如"共享元素要在页面根插层" vs "SDK 重组件必须**直挂**页面根"），则机制**整块保留**；② 保留时**必须把"写入端已归零"写进注释**（`HERO_TRANSITION_MS` 处注明"当前零调用方、恒 false ⇒ `pop()` 那条 branch 是死分支但无害"），避免后人误以为它在工作；③ **必须撤得干净的部分**：所有 `.geometryTransition` / `.transition` 绑定 + 各页 `@Prop heroEnter` + 骨架里的分支判据 —— 只撤一半会"起了手却没人播"（见 LSN-034 A） |
+| 新建工程/写 `.gitignore` 或把工程推上 Git | 照抄模板 `.gitignore` 的裸 `signing/` ⇒ **整个签名目录被忽略**，仓库里没有 p7b/cer/p12/csr；clone 到新机器构建不出可安装包（`9568320 no signature file`） | **签名打包文件全提交**（p7b/cer/p12/csr）；**material 不提交**（换设备重输密码后重新生成）；**明文密码绝不记录**（build-profile 里只有密文）。**换应用只换 p7b**，cer/p12/csr 跨 Icey 系通用（LSN-029 终版，2026-10-17） |
 | 详情/只读页的某个字段为空 | 整块隐藏（`if (hasNote) { 备注卡 }`）⇒ 用户**分不清"没填"还是"不支持"**（本工程实测：详情页备注卡「无备注不渲染」，随即被用户报「详情页要能显示备注」） | **详情/只读页的字段卡常驻**，空值给占位文案（「暂无备注」）——"这一栏存在"本身要被表达出来。表单/编辑页相反：空字段不渲染更清爽（没有"存在与否"的疑问）。备注等正文块要用与输入框同款承载（`surface` + 0.5vp `fieldBorder` 描边），别直接铺在玻璃上（见 LSN-025） |
 | 本地书/音乐"存入库、不复制文件"后**重启打不开**（导入当次正常、重开白屏/无声） | 只调了 `FilePermission.persist([uri])`，**没有每次启动 `activatePermission`**。持久授权跨重启不自动生效 ⇒ `openSync(原始URI)` 抛 `13900001 EPERM` ⇒ 读取 catch 静默 return ⇒ 画布/列表全空 | ① 启动恢复链路（`EntryAbility.startupReady`，数据仓库 init **之后**）加 `await BookRepo.activatePermissions()`（遍历全部 bookUrl 调 `FilePermission.activate`）；② 读取路径加 `FilePermission.ensureActive(uri)` 单条兜底。★ 指纹 = **导入当次能看、杀进程重开就白**；日志找 `13900001`/`EPERM`（见 LSN-030） |
 | 读取失败导致"整片空白"的页面（阅读页纯色、列表空态） | catch 里只 `AppLogger.error(...)` 然后 return ⇒ 用户看到一块底色，**没有任何提示**，长相差不多的根因（权限/文件移动/偏移错位）无法区分，排查几轮都在猜 | **绝不静默失败**：把失败落到 `@State loadError`，渲染**可见错误态 + 重试按钮**；并对"内容为空""排版 0 页"等**非异常**分支同样报错（见 LSN-030） |
@@ -291,7 +305,12 @@
 | 给"整页"加转场动画（缩放 / 翻页 / 位移） | 把变换挂在**包裹内容子树**的容器上 ⇒ **命中测试热区随变换后几何收窄**：`scale 0.29` 时热区只剩原尺寸 29%；`rotateY(-90°)` + `centerX:0` 时**投影宽 → 0 ⇒ 热区宽为 0 ⇒ 全页点不到**。⚠️ 而 `XComponent`（Reader Kit 的 `ReadPageComponent`）/ `Canvas` 这类 **native 直绘内容不受 ArkUI 变换影响** ⇒ 合成「**看得见、点不动**」这一最难排查的组合（自绘与 Kit 两条内核表现完全一致，极易被当成两个 bug） | **凡改变组件几何的修饰符（`scale` / `rotate` / `translate` / `rotate3D`…）一律不得挂在包裹内容子树的节点上** —— 无论它是不是"只是一个动画"。要"看起来像整页在动"就**另起一层纯视觉层**（同尺寸 + `hitTestBehavior(HitTestMode.None)` + 播完 `opacity 0`），内容层恒定满尺寸、恒定零变换。这样即使动画一帧都没跑，最坏也只是**视觉瑕疵**而非**静默致瘫**。★ 指纹 = 正文能看见但点击/手势全无响应，日志 `InputKeyFlow: Touch test result is empty.`（正常应为 `TTHNI:{ T: List, D: 36 }` 之类有节点）（见 LSN-032） |
 | 把图片 / 长文本存进 `preferences` | **`preferences` 的 string 值上限 = 8192 字节**（官方硬约束）⇒ 720w JPEG 的 base64 data URI（40~110 K 字符）**必然超限**，`putSync` 每次抛 `Parameter error. The type of 'value' must be ValueType.` 被 catch 吞掉 ⇒ **该槽位从未落盘**。★ 极具欺骗性：当次运行内存态有值 ⇒ **显示完全正常**；**重进 App `getSync` 读回空串 ⇒ 失效**（用户报「壁纸失效 / 重启就没了」） | `preferences` **只放轻量标量**（开关 / 档位 / 短字符串 / 路径 / `file://` URI）；图片、长 JSON、二进制**一律落沙箱文件**，只存路径。路径转 URI 用官方 `fileUri.getUriFromPath()`，别手拼 `'file://' + path`。**并给 `save()` 加显式长度预检**（`value.length > 8192` 就报 error 并放弃写入）——让"存了却没生效"在运行日志里一眼可定位，不再静默丢值（见 LSN-033） |
 | 对接 SDK 级重组件（Reader Kit / Map / Camera / 各种 `XComponent`）时页面「**看得见、点不动**」 | 删干净全部几何变换后**仍然点不动**（同一 P0 复发第 3 次）⇒ 根因换成了**包裹层**：SDK 内部控制器只在「组件**直挂**真·路由页页面根 Stack」的形态下可靠建立。组件与页面根之间**每多一层容器都是一个独立变量**，**不论它是否参与变换**（视觉层 / 自定义组件 / 带 padding 的容器都算）。★ 排除法顺序：先证伪"窗口级全屏"（`git show HEAD:` 看它**本来就存在**⇒非根因），再证伪几何变换，最后收敛到层数 | **两条铁律必须同时满足**：**零变换**（LSN-032）+ **零包裹层**（本条）。容器一律删掉、`build()` 直挂 `pageRoot()`；状态栏避让**绝不给组件本体加 `padding`**（padding 会让 SDK 仿真翻页动画在**组件内容盒内**合成、padding 区成硬裁切线 ⇒ 动画上下被裁切）⇒ 改「**组件自身 `height` + 顶部 `margin`**」（margin 不计入自身高 ⇒ 真实高 == 上报 SDK 的 `viewPortHeight`，两者严格同源），并配 `Stack({ alignContent: Alignment.Top })`。⚠️ 撤掉"飞行层/一镜到底"必须**整条链路一起撤**（调用点 + 判定点 + 中继 + 组件），否则留下"起了手却没人播动画"⇒ 转场被关 ⇒ **硬切**（见 LSN-034 A） |
+| 「同一元素在两个页面显示成两套样子」（如书架封面 vs 详情页封面） | 各页面各写一份占位绘制 ⇒ 默认绘制**有两套实现**，观感不统一；做共享元素转场时因"两端不同源"，只能**两端都不绑 hero** 来避免断层（用户要的动画一并丢了） | **先统一绘制、再谈转场**：把默认绘制抽成**唯一 `@Component`**（尺寸由调用方容器决定，用 `@Prop showTitle` 之类的开关适配不同形态），所有消费点替换。⚠️ 抽完后每个 `if` 分支都要**重新补绑** `geometryTransition`（`@Builder` 挂不了属性，需外包一层只含共享元素本身的 `Stack`）——漏一支 = 单边注册 = `pop(false)` 下**返回硬切**（见 LSN-035） |
+| 给 `@Component` 抽出来的元素做共享元素转场 | 直接把它包在外层容器上挂 `geometryTransition`（外层还叠着书脊/页缘/scrim/文字信息层）⇒ 这些图层被一起"搬"到目标页 ⇒ 视觉断层 | hero 层必须**只含共享元素本身**：**另起一层 `Stack` 只放该组件**，属性挂在这层 `Stack` 上；外层容器（有额外图层的那层）不挂。这条与"两端视觉同源"是同一件事的两面（见 LSN-035） |
 | 快速多次「返回 → 进入」同一页 ⇒ **一直显示"正在排版 / 加载中"** | 三条机制叠加：① 退出时把 `release()` **排进延迟批次**（为让开转场），而 **SDK 控制器在新旧会话间是同一个实例**（进程级）⇒ 用户 ~50ms 内重进、新会话已 `start()`，旧页面在 T+420ms 才 `releaseBook()` ⇒ **从外部释放掉新会话** ⇒ `pageShow` 永不回调；② `on(type, cb)` 是**追加**语义 ⇒ 重试/重进叠加 N 层回调（处理函数跑 N 遍，**完全不报错**）；③ `loading` 只靠外部事件 `pageShow` 收起 ⇒ 无超时出路就是**永久 loading** | ① `release()` **立即执行**（释放 native 资源不是耗时操作，留在延迟批次换不来流畅度却制造竞态）；延迟批次只留**真正耗时**的（全库序列化落盘 / 跨进程窗口调用 / 统计结账）；② 注册即替换 —— **先 `off(type)` 再 `on`**（`off` 省略 callback = 注销该类型全部回调）；③ 加**两道分开的看门狗**：`readyWatchdog`（管组件挂载前，8s）与 `pageWatchdog`（管 `startPlay` 后的**外部**事件，6s），超时**强制收起 loading + 渲染可见错误态（带重试）**；④ 入口加防重入守卫、回调处理器加 `disposed` 守卫（见 LSN-034 B） |
+| 多级页面（主页 / 子页）的分组卡片「间距和内边距看起来不统一」，但每处单看都合理 | 两个页面各用一个卡片组件，各自把 `margin/padding` 写死且**值不一样**，甚至同一个组件按「有无标题」分了档 ⇒ 用户跨页切换时能直接看出松紧不一，却极难定位（页面里搜不到数值，全封在组件里） | **两套组件的间距口径逐项对齐，以「主页」为基准**：卡间距 16 + 内边距恒定（不分档）；只有 Divider 左缩进按「项有无图标」各自对齐自己那侧的文字列。⚠️ **禁按有无标题分档内边距**（差 3vp 恰好是肉眼可辨量级）。排查 = `grep -rn "<卡片组件名>" --include=*.ets` 下钻对比 `margin/padding/Divider` 三处（见 LSN-037） |
+| 做「缩略图 → 全屏」共享元素一镜到底，关闭时**黑底连图片一起瞬间消失**（看不到飞回） | 把 `geometryTransition` 挂在 `bindContentCover` 的覆盖层里。覆盖层一收起就**立刻拆掉整棵子树** ⇒ 共享元素的目标侧没了 ⇒ 没有回程可飞。这是**结构冲突**，不是参数问题 —— `ModalTransition.NONE` / `transition: IDENTITY` / 黑底两段式 / 显式透明背景**全部无效** | **改成真正的路由页**：预览层 = `NavDestination`（`.mode(DIALOG)` + `.hideTitleBar(true)`），注册进 `navDestinationBuilder`（**不可当普通子节点挂**，否则立即渲染）；开 = 源页 `animateTo({250,EaseIn}, pushPath(…, false))`、关 = `animateTo({300,EaseIn}, pop(false))`；源侧缩略图打开时**让位**（`opacity(ready && !previewOn ? 1 : 0)`）、关闭时**在同一个 animateTo 里复位**；两侧 transition 反向：源侧 `opacity(0.99)` / 目标侧大图 `OPACITY`。★ 判据 = 官方 `transitions-collection` 里 `geometryTransition` 6 处全在 push/pop，`bindContentCover` 2 处**没有一处**配几何转场（见 LSN-039） |
+| 用 `SegmentButton` 做分段切换（分类 / 歌曲-专辑） | ① 把 `buttons` 写成**变长数组 + `undefined` 占位**（想「统一补齐到 4 项」）⇒ **真机点进去就闪退**（`Cannot read property icon of undefined`，编译不拦）；② 想调高度写 `.height(43)` ⇒ **无效且不报错**；③ `onItemClicked` 链式写 ⇒ 编译错 `does not exist on type 'void'` | ① `buttons` 是**定长元组**，按段数分派构造（2/3/4/5 各一个方法）+ **不要 `as` 断言**；② 高度只能改 `buttonPadding`（配套重算圆角：药丸半径 = 药丸高/2+0.5）；③ 两个回调写在**构造参数**里。见 LSN-038 |
 
 ---
 
@@ -470,7 +489,14 @@ SDK 版本号的**书写格式按 API 级别分界**（API ≥ 26 用点分制 `
   `SettingsTab` / `AboutPage` 的 List 也都带 `.padding({left:16,right:16})` —— 新增页面照抄
 - **孪生反例（不会裁切但会"窄一圈"）**：卡片**既**被 List padding 又自带横向 margin → 双倍内缩 32vp，
   同一 App 内两页卡片左右边界不一致。归一化时把这两类一起清
-- **口诀**：横向内缩归 List，卡片只留纵向间距
+- **同族第三例（2026-10-04，`BookEditPage` 全宽保存按钮）**：`ListItem { Button('保存').width('100%').margin({left:16,right:16}) }`
+  —— 与卡片完全同因（ListItem 是满宽的，16vp 没人吸掉 ⇒ 右端贴屏幕边）。
+  **修法等价**：外层包 `Row().width('100%').padding({left:16,right:16})` 承接内缩，按钮回到裸 `width('100%')`。
+  ⇒ **判据是"父容器有没有先把这 16vp 扣掉"，不是组件的类型**（卡片 / 按钮 / 任何满宽件都适用）。
+  ⚠️ 反向陷阱：**看到别处 `Button.width('100%')` 没出问题就照抄** —— 那是它的内层容器
+  自己带了 `.padding({left:16,right:16})`（如 `BookDetailPage` 的内容列）。
+  **必须看父容器，不能复制结论。**
+- **口诀**：横向内缩归宿主，子项只留纵向间距
 
 ### LSN-015 跨组件只传"展示型数据类"：@Prop 深拷贝会丢方法，视图层禁止重算
 - **风险**：🟠 中频（页面一多、图表一加就撞上），且后果是**运行时 undefined / 白屏**而非编译错误
@@ -713,6 +739,18 @@ SDK 版本号的**书写格式按 API 级别分界**（API ≥ 26 用点分制 `
   - 任何 `@Builder(param)` 里 param 由 `this.someState` 算出来的显示值
 - **判别口诀**：
   - **"这个值会变吗？会变就别当参数传"**
+- **⚡ 一眼定案的现场判据（2026-10-12 BiliDownload-Harmony 实证，值得优先用）**：
+  **同一屏上，同一个值 ——「build 内联 `Text(this.xxx)` 会实时更新」而「经 `@Builder(a, b)` 渲染的不更新」**
+  ⇒ **立刻就是本坑**，别再去查数据层/依赖登记/ForEach key（那些方向是错的）。
+  实例：详情页「按钮」里内联 `Text(\`${this.task.percent}%\`)` **实时更新**；
+  同页「任务状态卡」用 `this.row('进度', \`${...}%\`)`（按值 @Builder）**永远冻结**。
+  ⇒ **刷新类 bug 的第一刀就切这里**：`grep` 一下那个不更新的文案是不是走 `@Builder`。
+- ⚠️ **别把「实时刷新两件套」用错地方**：`@StorageLink @Watch` → `@State renderTick` → build 零重量锚
+  这套只能驱动**内联读取**的元素重渲染；**它救不了按值传参的 `@Builder`**
+  （builder 内部只认首次构建的字符串快照）。两者叠加 = 表里不一（部分更新、部分冻结）。
+- ⚠️ **组件内 `@Builder` 里凡是读 `this.xxx` 的，一律写成「零参数 + 体内现读」**
+  （如把 `layer(content, op)` 拆成 `layerA()`/`layerB()`，各自内部读 `this.aText/this.aOp`），
+  这是"双层交叉淡化"这类模式最容易踩的地方（16 个字符的便利换一次线上冻结）。
   - **"@Builder 的参数里出现 `this.<状态>`（或依赖状态的表达式）→ 一定会 stale"**
   - **"UI 不跟着变、但数据是对的" → 先怀疑 Builder/参数边界，而不是数据层**
 - **⚠️ 验证姿势（这条最容易骗人）**：
@@ -1159,40 +1197,41 @@ ForEach(v.rows, (r: KvRow) => { this.kvRow(r) },
 
 ---
 
-### LSN-029 `.gitignore` 签名约定：`signing/` 必须进仓库，**只忽略 `material/` 缓存**
+### LSN-029 `.gitignore` 签名约定（2026-10-17 终版）：signing 打包文件全提交、material 不提交、密码不记录
 
 - **风险**：🔴 仓库里一个签名文件都没有 ⇒ 新机器 clone 后 `assembleHap` 产不出可安装包
   （`entry-default-unsigned.hap` / 安装报 `9568320 no signature file`），
   也无法复现签名类问题（`00303074` p7b bundle-name 不匹配等）。
-  排查时才发现"拿不到 profile，只能回头补提交"。
-- **场景**：2026-09-29 Icey-Reader —— 照抄本 Skill 内置模板的 `.gitignore`，
-  其第 13 行是**裸的 `signing/`** ⇒ 整个签名目录被 ignore，`git status` 永远看不见；
-  用户复核 commit 时发现并纠正。
-- **定案规则**（与 Icey-Player-Harmony 同约定）：
+- **场景**：2026-09-29 Icey-Reader —— 照抄模板 `.gitignore` 的**裸 `signing/`** ⇒
+  整个签名目录被 ignore，`git status` 永远看不见；用户复核 commit 时发现并纠正。
+- **⚠️ 2026-10-17 终版定案（用户原话：「只是不记录密码 不提交 material
+  因为换设备都要重输密码 material 也会重新生成」）**：
+  本条经历过**两次反转**（09-29 "material 是缓存可忽略" → 10-08 "material 必须进仓库"），
+  终版以**用户工作流**为准：换设备 = 重输密码 ⇒ material 重新生成 ⇒ **material 不提交**。
+  （v1.4.1 的"material 必须进仓库"更正**作废**——那是单机换目录场景的结论，跨设备场景
+  material 根本不需要。）
 
   ```gitignore
-  **/.test
-  /.appanalyzer
-
-  # 签名文件：**不忽略**（可复现构建的必要部分）
-  # 例外：material/ 是 hap-sign-tool 生成的哈希命名中间缓存，每次构建可重建
+  # 签名：p7b/cer/p12/csr 全提交；material 不提交（换设备重输密码后重新生成）；
+  # 密码只以密文存在 build-profile.json5 里随仓库走，明文密码绝不记录
   /signing/material/
   /signing/debug/material/
   ```
 
-  | 路径 | 是否版本化 | 理由 |
+  | 路径 | 是否版本化 | 理由（终版） |
   |---|---|---|
-  | `signing/debug/*.p7b` `.cer` `.p12` `.csr` | ✅ 进仓库 | 唯一能让新机器构建出**可安装** HAP 的材料 |
+  | `signing/debug/*.p7b` `.cer` `.p12` `.csr` | ✅ 进仓库 | 新机器构建可安装 HAP 的必要材料 |
   | `signing/release.*` | ✅ 进仓库 | 同上（发布链） |
-  | `signing/**/material/**` | ❌ 忽略 | 签名工具中间缓存，哈希命名，可重建 |
+  | `signing/**/material/**` | ❌ **不提交** | 换设备重输密码后重新生成（提交它反而是噪音） |
+  | `build-profile.json5` 里的**密码密文** | ✅ 随仓库走 | 密文安全；**明文密码绝不写进任何文件** |
 
-- **⚠️ 易错点**：参考项目（Icey-Player-Harmony）实际只写了 `/signing/material/`，
-  **漏了 `signing/debug/material/`**（其 debug 下的 material 一直被追踪）。
-  照抄时要**两条都写**，否则 debug material 仍会进仓库。
-- **⚠️ 判定口径**：`git check-ignore <目录>` 对**目录路径**的判定不可靠
-  （目录返回 TRACKED，但其下文件实际已被忽略）；
-  验证一律用 **`git status --porcelain`** + **`git ls-files | grep material`**（权威）。
-- **口诀**：**"签名材料进仓库、material 缓存除外；check-ignore 不可信，用 ls-files 验"**
+- **⚠️ 跨应用复用（2026-10-17 用户：「换应用就是换 p7b 其他的都通用」）**：
+  **同一套 cer / p12 / csr 跨所有 Icey 系应用通用**，换应用只需要**换 `.p7b`**
+  （profile 按 bundleName 绑定）⇒ 新应用的 signing 接入成本 = 拷全套 + 换一个 p7b。
+  （实证：Icey-Reader 的 `signing/debug/debug.p7b.bak-iceyplayer` 就是换应用时留下的旧 p7b 备份。）
+- **⚠️ 判定口径**：`git check-ignore <目录>` 对**目录路径**的判定不可信；
+  验证一律用 **`git status --porcelain`** + **`git ls-files | grep signing`**（权威）。
+- **口诀**：**"signing 全提交、material 与明文密码除外；换应用只换 p7b；check-ignore 不可信用 ls-files 验"**
 
 ---
 
@@ -1489,6 +1528,294 @@ ForEach(v.rows, (r: KvRow) => { this.kvRow(r) },
 
 ---
 
+### LSN-035 共享元素（`geometryTransition`）的**三个成对约束**：视觉同源 / 两端都绑 / 抽组件要补绑
+
+- **场景**：2026-10-03 Icey-Reader。用户要求「**列表的封面和到处的详情之类的封面实现效果要统一
+  （非自定义 默认绘制的情况下）**」⇒ 把「无封面书的默认绘制」从两套实现（书架的实体书封
+  `@Builder` vs 详情页/弹窗的灰褐渐变色块）收敛成一个 `@Component BookCover`。
+
+- **⚠️ 约束 1：两端必须"视觉同源"，否则插值必断层**
+  官方明文：*"源组件和目标组件应尽量使用相似的样式，否则系统生成的过渡动画会出现视觉断层"*。
+  本工程的**旧做法是"反向妥协"**——因为两端本来就不同源，所以干脆**两端都不绑**
+  （`hasCover(b) ? heroIdOf(url) : ''`）。★ 这条"为了不断层而放弃动画"的取舍**本身是错的信号**：
+  它说明默认绘制该统一了。统一后这条分流**必须整体删除**（两端恒绑）。
+
+- **⚠️ 约束 2：`@Builder` 调用挂不了属性 ⇒ 用 `@Builder` 画封面时那一支**根本没绑 hero**
+  ```ts
+  // ❌ 旧：无封面分支调 @Builder，无法链式挂 geometryTransition
+  } else {
+    this.plainBookCover(b)
+  }
+  ```
+  **抽成 `@Component` 后**，必须**再外包一层 `Stack`** 才能挂属性；若漏掉 ⇒ 详情页单边绑定
+  ⇒ 一个 id 只绑一个组件 ⇒ 系统找不到配对对象；而 `pop(false)` 已关掉系统转场 ⇒
+  **返回直接硬切**（比不做 hero 更差）。★ **判据**：grep 两端 `geometryTransition`，
+  数一数"有封面 / 无封面"两个分支各自的绑定点 —— **每个分支都要有，缺一支就是单边**。
+
+- **⚠️ 约束 3：hero 的 `@Builder` 层要"只含共享元素本身"**
+  宫格外层 `Stack` 里还叠着书脊 / 页缘 / scrim / 书名信息层 ⇒ **不能**把 hero 挂外层
+  （会把书名文字一起"搬"到目标页，读作断层）。外包的那层 Stack **只放默认书封**。
+
+- **⚠️ 配套：置位（`heroBackArmed`）与两端绑定条件必须同一口径**
+  返回方向若由"置位 + `pop()` 内统一消费"实现，则该置位条件**必须与两端 `geometryTransition`
+  的绑定条件严格一致**（本轮同步改为"恒 true"）。不同源 ⇒ 单边注册 ⇒ 静默不播放 + 硬切。
+
+- **口诀**：**"两端不同源就先统一绘制，别用'不绑'来遮断层；抽了组件记得补绑 —— 每个分支都要有"**
+
+---
+
+### LSN-039 共享元素「一镜到底」**禁止与 `bindContentCover` 混用** —— 唯一正确形态是路由页 push/pop
+
+- **场景**：2026-10-12 BiliDownload-Harmony。图片全屏预览用「缩略图 → 全屏」的
+  `geometryTransition` 共享元素转场，容器却是 `bindContentCover` 全屏覆盖层。
+  **症状固定为**「关闭时黑底连图片一起瞬间消失，看不到图片飞回」——
+  反复调 `modalTransition: NONE` / `transition: IDENTITY` / 黑底两段式淡出 /
+  给覆盖层显式透明背景，**七八版都修不动**。
+
+- **★ 根因（一句话）**：`bindContentCover` 一收起就**立刻拆掉整棵覆盖层子树** ⇒
+  共享元素的"目标侧"在转场一开始就没了 ⇒ **没有回程可飞**。
+  这不是参数问题，是**两种机制的结构冲突**。
+
+- **★ 判据（先数官方示例，别先调参数）**：去官方 `transitions-collection`
+  （DevEco 示例合集「实现转场动效功能合集」）里各数一遍：
+  ```bash
+  B=<transitions-collection>/entry/src/main/ets
+  grep -rn "geometryTransition" --include=*.ets "$B" | wc -l   # → 6，全在 push/pop 场景
+  grep -rn "bindContentCover"  --include=*.ets "$B"            # → 2 处，**没有任何一处**配 geometryTransition
+  ```
+  ⇒ **官方从来不混用**。`geometryTransition` 的正确容器只有一种：
+  **`Navigation` 的 push/pop**（`NavDestination` 页面）。
+
+- **✅ 正确形态**（逐行照抄 `ImageLongTakeTransition/ShowLargeImageWithGesture`）
+
+  **① 预览层 = 一条真正的路由页**（不是覆盖层）
+  ```ts
+  @Component
+  export struct CoverPreviewDestination {
+    private pathStack: NavPathStack = new NavPathStack();
+    @State url: string = '';
+    @State geometryId: string = '';
+
+    private popPreview(): void {   // 关闭：必须在 animateTo 里 pop
+      this.getUIContext().animateTo({ duration: 300, curve: Curve.EaseIn }, () => {
+        this.pathStack.pop(false);          // ← false = 不要系统转场
+      });
+    }
+
+    build() {
+      NavDestination() {
+        CoverPreview({ url: this.url, geometryId: this.geometryId,
+                       onRequestClose: () => { this.popPreview(); } })
+      }
+      .hideTitleBar(true)
+      .mode(NavDestinationMode.DIALOG)      // ← 全屏态
+      .transition(TransitionEffect.opacity(0.99))
+      .onBackPressed(() => { this.popPreview(); return true; })
+      .onReady((ctx: NavDestinationContext) => {
+        this.pathStack = ctx.pathStack;
+        const p = ctx.pathInfo?.param as Record<string, Object> | undefined;
+        if (p === undefined) return;
+        this.url = p['url'] as string;      // ⚠️ 逐字段重建（ArkTS 禁整对象 as）
+        this.geometryId = p['geometryId'] as string;
+      })
+    }
+  }
+  ```
+
+  **② 注册在路由分发器里**（`Index.navDestinationBuilder`）——
+  ⚠️⚠️ **绝不能把它当普通子节点挂在页面树上**：`NavDestination` 一旦脱离 push/pop
+  会**立即渲染**（实测：首页就出现了预览层的「保存至图库」按钮）。
+  ```ts
+  } else if (name === ROUTE_COVER_PREVIEW) {
+    CoverPreviewDestination()      // ← 由 push 触发时才开始渲染
+  }
+  ```
+
+  **③ 源页打开 / 关闭 —— 全部发生在 `animateTo` 里**（官方 `PageOne` / `PageTwo`）
+  ```ts
+  // 打开
+  private openCoverPreview(): void {
+    this.getUIContext().animateTo({ duration: 250, curve: Curve.EaseIn }, () => {
+      this.coverPreviewOn = true;                       // 源侧缩略图让位（见下）
+      this.pathStack.pushPath({ name: ROUTE, param: p }, false);   // false = 不要系统转场
+    });
+  }
+
+  // 关闭（由预览页回调）—— **同一个 animateTo 里"复位让位标志 + pop"**
+  private closeCoverPreview(): void {
+    this.getUIContext().animateTo({ duration: 300, curve: Curve.EaseIn }, () => {
+      this.coverPreviewOn = false;                      // 缩略图回到树上，才有"回程落点"
+      this.pathStack.pop(false);
+    });
+  }
+  ```
+
+  **④ 源侧缩略图必须"让位"**（官方 `isFirstPageShow = false`）：
+  打开时把缩略图隐去、关闭时恢复，**否则"源"与"目标"同时在场，共享元素不知道跟谁**：
+  ```ts
+  .opacity(this.coverReady && !this.coverPreviewOn ? 1 : 0)
+  ```
+  ⚠️ 让位标志要**每个缩略图一个**（封面 / 头像各一个）——共用一个的话，
+  「点封面」会把头像也一起隐掉。
+
+  **⑤ 两侧 `transition` 取值是反的**（官方 `MyComponent` vs `PageOne`）：
+  | 侧 | 值 |
+  | --- | --- |
+  | **源侧缩略图** | `TransitionEffect.opacity(0.99)`（恒近不透明，把视觉让给共享元素） |
+  | **目标侧大图** | `TransitionEffect.OPACITY`（真淡入淡出，与黑底同一条时间线） |
+  | 目标侧容器（`NavDestination`） | `TransitionEffect.opacity(0.99)` |
+  抄反 ⇒ 收起时目标侧不淡出 ⇒ 读作"被一起清掉"。
+
+- **⚠️ 关闭回调要走"登记"而非"预览页自己 pop"**：预览页不知道"谁是源页、该复位哪个标志"。
+  开预览前由**源页**把自己的关闭方法登记到一个静态宿主（`PreviewHost.setCloser`），
+  预览页的**任意**关闭路径（关闭钮 / 返回键 / 手势）统一回调它；
+  源页 `aboutToDisappear` 里 `clearCloser()` 防止回调打到已销毁的组件上。
+
+- **口诀**：**"几何转场只跟 push/pop 走；覆盖层收起会拆树 —— 数官方示例，别调参数"**
+
+---
+
+### LSN-038 给 SDK 高级组件传「变长数组」当参数 ⇒ P0 真机闪退（2026-10-07 Icey-Player-Harmony）
+
+- **场景**：用 `SegmentButton` 做详情页的「歌曲 / 专辑」分段切换。为了让"2 项 / 3 项"
+  共用一份构造代码，写成"先组装数组、补齐到 4 个元素、短位填 `undefined`"：
+  ```ts
+  const b2 = buttons.length > 2 ? buttons[2] : undefined;   // ← 2 段时是 undefined
+  return SegmentButtonOptions.tab({ buttons: [b0, b1, b2, b3] });   // 编译通过
+  ```
+  ⇒ **点进详情页直接闪退**（进程被杀）。
+
+- **★ 真机堆栈（锁死根因，非猜测）**：
+  ```
+  Reason:TypeError
+  Error message:Cannot read property icon of undefined
+    at SegmentButtonItemOptions (segmentbutton.js:283)
+    at SegmentButtonItemOptionsArray (segmentbutton.js:302)
+    at SegmentButtonOptions (segmentbutton.js:417)
+    at tab (segmentbutton.js:455)
+    at buildOptions entry (entry/.../SegmentTabs.ets:90)
+  ```
+
+- **★ 机理（可迁移）**：`CommonSegmentButtonOptions.buttons` 的类型是
+  **`SegmentButtonItemTuple` = 定长元组**：
+  ```ts
+  declare type ItemRestriction<T> = [T, T, T?, T?, T?];   // SDK d.ts:712
+  ```
+  段数只能 **2~5**，**必须按实际个数构造元组**。SDK 内部 `SegmentButtonItemOptionsArray`
+  会**逐元素访问字段**（这里是 `item.icon`，为兼容 icon 型 / icon+text 型统一读）
+  ⇒ 数组里出现 `undefined` 就抛 `TypeError` ⇒ `Kill Reason:Js Error` ⇒ 应用被杀。
+
+- **正解**：**按段数分派**，各分支写**长度精确匹配**的元组字面量：
+  ```ts
+  if (b.length === 3) return SegmentTabs.buildOptions3(b[0], b[1], b[2]);
+  if (b.length === 4) return SegmentTabs.buildOptions4(b[0], b[1], b[2], b[3]);
+  // buildOptions3 内：buttons: [a, b, c],
+  ```
+  ⚠️ **别写 `as SegmentButtonItemTuple`**：那是三路联合类型
+  （`ItemRestriction<Text> | ItemRestriction<Icon> | ItemRestriction<IconText>`），
+  断言后反而报 `Type 'SegmentButtonItemTuple' is not assignable to type
+  'ItemRestriction<SegmentButtonTextItem>'`。**直接传元组字面量**，ArkTS 自会选支。
+
+- **⚠️⚠️ 三条「编译绿但真机错」的姊妹坑（同一个组件，一起记）**：
+  | 写法 | 结果 |
+  |---|---|
+  | `buttons` 传变长数组（含 `undefined`） | **真机闪退**（本条的坑），编译器**不报** |
+  | `.height(43)` / `.width()` / `.margin()` 写在 `SegmentButton` 上 | **静默无效**（SDK 原文 "does not support universal attributes"） |
+  | `onItemClicked` / `enableStateAnimation` 链式点调用 | **编译错** `Property 'xxx' does not exist on type 'void'`（它们是**构造参数**） |
+  | 想调高度 | 唯一旋钮 = `buttonPadding`；圆角要与高度配套（药丸半径 = 药丸高/2 + 0.5，否则读作"圆头方块"） |
+
+- **★ 通用判据**：**看到 SDK 类型里 `T?` 结尾的元组（`[T, T, T?, T?, T?]`）就要警觉** ——
+  它的语义是"最多 5 个、但**必须按实际个数**给"。传变长数组 + 占位 = 真机崩。
+  ⇒ **「能编译过」对 SDK 高级组件的「结构约束」没有说明力**（只对类型约束有效）：
+  断言能绕开长度校验、通用属性选了不存在的旋钮也不报错、内部字段读取更是编译期不可见。
+  **这类组件必须真机跑一次目标路径**，别拿「编译绿」当验证。
+
+- **口诀**：**"定长元组按个数给，别补 undefined；SDK 高级组件不支持通用属性，别把它当普通容器调"**
+
+---
+
+### LSN-037 多级设置页的卡片间距/内边距必须「一套组件一个口径」；分档即泄漏（2026-10-06 Icey-Player-Harmony）
+
+- **场景**：用户连着报两轮 —— ① 「设置页和子页的两张卡片之间的间距是不是不统一？」
+  ② 「卡片的内边距应该也是不统一吧？同样以设置页的为准」。本工程有两套分组卡片组件：
+  `SettingsGroup`（设置主页专用，项带图标）与 `SettingsGroupCard`（7 个子页共用，项无图标）。
+
+- **★ 判据（可迁移）**：**「不统一」类反馈要拆成两类，不要一刀切**——
+  - **必须严格一致**：卡间距、卡片内边距、圆角、阴影/材质档位。这些是**跨页面同一视觉语言**。
+  - **允许不同**：任何「**对齐自己那一侧内容**」的缩进/缩进类值。
+    本例中 Divider 左缩进 主页 52 / 子页 12 **是正确的**（项带 32vp 图标 vs 无图标），
+    把它一起「统一」反而会让分割线跟文字列错位。**改之前先问「这个数值在跟什么对齐」。**
+
+- **两个真实缺口（都是「单看合理」型）**：
+  | 项 | 主页（基准） | 子页（原） | 症状 |
+  |---|---|---|---|
+  | 卡间距 | `margin({bottom:16})` | 原 `margin({left:16,right:16,top:12})` | 子页实际间距 12 ⇒ 整体更紧 |
+  | 卡片内边距 | 恒定 `6/6/1/1` | **按有无标题分档**：有标题 `3/3`、无标题 `6/6` | 带标题的卡上下比主页窄 3vp |
+
+  ⚠️ **两个坑的形态不同**：
+  - 卡间距那个是「**缺一个维度**」型（子页无 bottom ⇒ 全靠下一张卡的 top 隔开）——
+    **子页卡片若既无 `margin.bottom` 又把 `top` 写小于主页，永远比主页紧**。这类缺口只在两页对比时才显形。
+  - 内边距那个是「**聪明过头**」型：当初为「有标题时少留白更紧凑」分档，
+    实际 3vp 恰好落在**肉眼可辨**的量级（< 2vp 不可辨，> 4vp 明显）。
+    **教训：给同一个视觉元素做「按场景微调」前，先算这个差值能不能被看见；能看见就不该分档。**
+
+- **正解**：
+  ```ts
+  // SettingsGroupCard —— 取消分档，一律与主页看齐
+  .margin({ left: 16, right: 16, top: 16 })
+  .padding({ top: 6, bottom: 6, left: 1, right: 1 })
+  // Divider 保持本组件自己的 12（对齐无图标的文字列），不跟主页的 52 统一
+  ```
+  ⚠️ **改前先确认没有覆写**：本例 7 个子页共用该组件且无覆写 ⇒ **一处改全生效**；
+  但若某页自己传了 `margin/padding`，改组件不会生效，**必须 grep 消费点数一遍**。
+
+- **⚠️ 排查姿势（通用）**：用户说「看起来不统一」而页面里搜不到这些数值时，
+  **它们全封在组件里** ⇒ `grep -rn "<组件名>" --include=*.ets` 列出定义与消费点，
+  对比两个同类组件的 `margin` / `padding` / Divider 三处。差异通常就是 1 个数字，
+  且**必须在组件里改，页面里改无效或只改一处**。
+
+- **口诀**：**"跨页同一视觉语言必须同口径；对齐自己那侧内容的缩进允许不同；给同一元素分档前先算差值能不能被看见"**
+
+---
+
+### LSN-036 「空集合不可表达」⇒ 那个功能必然是假的；破局靠给它一个持久化落点（2026-10-03 Icey-Reader）
+
+- **场景**：用户要求「加一个分组的页面 里面可以管理和**新增**」。旧实现在弹窗里只有「重命名 / 解散」，
+  且**刻意写了注释"不做新建空分组"** —— 因为分组只是**书的字符串字段**（没有独立表），
+  `groupNames()` 只能从现存书里收集 ⇒ **空分组根本不可表达**，新建出来的组重启即消失。
+
+- **★ 判据（可迁移）**：**当一个功能"实现不了"时，先问它的数据模型能不能表达这个状态。**
+  - 能新建但存不住 ⇒ 假功能；能存但没有独立落点 ⇒ 下次启动丢。
+  - 「刻意不做」的那条注释往往**不是偷懒，是当时的数据模型不支持** —— 读到这种注释要警觉。
+
+- **破局**：给"只有名字、没有内容"的集合一个**显式持久化落点**：
+  ```ts
+  private static emptyGroups: string[] = [];              // 空分组名清单
+  const KEY_EMPTY_GROUPS = 'groups_json';                 // 与书库同一个 preferences 文件
+  ```
+  `groupNames()` / `countInGroup()` / `renameGroup()` / `deleteGroup()` **全部纳入这个集合**：
+
+- **⚠️ 四条必须成套改（漏一条就语义不自洽）**
+  1. **读取合并去重**（先建空组、再往组里放书 ⇒ 两边都有该名）；
+  2. **改名要连带改空组名** —— 否则改完名字，那个 0 本的组会"复活"成旧名；
+  3. **解散要连带清登记** —— 不清的话组名仍在 `groupNames()` 里，用户看到的解散是**没生效**的；
+  4. **落盘与主数据同一次 flush** —— 分开写会出现「书落盘了、空组没落盘」的中间态（重启后分组忽隐忽现）。
+     ```ts
+     await pref.put(KEY_BOOKS, ...);
+     await pref.put(KEY_EMPTY_GROUPS, ...);   // 同一份"分组视图"的两半
+     await pref.flush();
+     ```
+
+- **⚠️「0 成员的组」不该弹确认框**：确认文案写的是"N 本书将移到「未分组」"，N=0 时**自相矛盾**，
+  且操作本身无破坏性 ⇒ 直接删 + toast。（生成确认文案前先算 N，为 0 就走另一条路。）
+
+- **⚠️ 静态类的集合变更不响应 UI**：`BookRepo.groupNames()` 是**普通 function**，改完不触发重渲染。
+  自增一个 `@State version`（`this.version++`）驱动重建 —— 与项目既有的"版本号信号 ≠ 布尔状态"（LSN-008）同源。
+
+- **口诀**：**"状态存不住就是假功能；先给集合找落点，再把读/改/删/flush 四处一起接上"**
+
+---
+
 ## 7. 自查清单
 
 ### 动手前（每次改动）
@@ -1624,9 +1951,12 @@ HarmonyAppTemplate/
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| **v1.3.12** | 2026-10-12 | 新增 **LSN-039**（**共享元素「一镜到底」禁止与 `bindContentCover` 混用 —— 唯一正确形态是路由页 push/pop**）+ 坑点速查表 +1 行。来源：BiliDownload-Harmony 图片全屏预览，`geometryTransition` 挂在 `bindContentCover` 覆盖层里，**症状固定为「关闭时黑底连图片一起瞬间消失、看不到飞回」**，反复调 `modalTransition: NONE` / `transition: IDENTITY` / 黑底两段式淡出 / 覆盖层显式透明背景，**七八版都修不动**。★ 根因 = **结构冲突**（覆盖层一收起就立刻拆掉整棵子树 ⇒ 共享元素目标侧没了 ⇒ 没有回程可飞），不是参数问题。★ 破局判据 = **去官方 `transitions-collection` 里各数一遍**：`geometryTransition` 6 处**全在 push/pop 场景**；`bindContentCover` 2 处、**没有任何一处**配几何转场 ⇒ 官方从来不混用。✅ 正解 = 预览层改成**真正的路由页**（`NavDestination` + `.mode(DIALOG)` + `.hideTitleBar(true)`，注册进 `navDestinationBuilder`；⚠️ **不可当普通子节点挂**，否则 `NavDestination` 脱离 push/pop 会**立即渲染**——实测首页就冒出了预览层的按钮）；开 = 源页 `animateTo({250,EaseIn}, pushPath(…, false))`、关 = `animateTo({300,EaseIn}, pop(false))`；源侧缩略图**打开时让位 / 关闭时在同一个 animateTo 里复位**（官方 `isFirstPageShow` 同义，否则「源与目标同时在场」共享元素不知道跟谁）；两侧 `transition` **取值相反**（源侧缩略图 `opacity(0.99)` / 目标侧大图 `OPACITY`）。附「关闭回调走静态登记（`PreviewHost.setCloser`）而非预览页自己 pop」的解法 |
+| **v1.3.11** | 2026-10-07 | 新增铁律 **12** + **LSN-038**（**给 SDK 高级组件传「变长数组」当参数 ⇒ P0 真机闪退**）。来源：用 `SegmentButton` 做详情页分段切换，为让「2 项/3 项」共用一份构造代码，写成「补齐到 4 个元素 + 短位填 `undefined`」⇒ **点进详情页直接闪退**，真机堆栈锁死：`TypeError: Cannot read property icon of undefined` @ `segmentbutton.js:283 SegmentButtonItemOptions`。机理：`buttons` 是 **`SegmentButtonItemTuple` = 定长元组**（`ItemRestriction<T> = [T, T, T?, T?, T?]`，SDK d.ts:712），段数只能 2~5 且**必须按实际个数构造**；SDK 内部 `SegmentButtonItemOptionsArray` **逐元素读字段**（`item.icon`）⇒ 遇 `undefined` 即抛。正解 = 按段数分派到 `buildOptions2/3/4/5`（各写长度精确匹配的元组字面量）；⚠️ **别写 `as SegmentButtonItemTuple`**（三路联合类型，断言反而报 `not assignable`）。★ 通用判据：**看到 `T?` 结尾的元组就要警觉 —— 「能编译过」对 SDK 高级组件的结构约束没有说明力**；同组件的兄弟坑一并收录（不支持通用属性、`onItemClicked` 是构造参数、高度唯一旋钮 `buttonPadding`）。坑点速查表 +1 行 |
+| **v1.3.10** | 2026-10-06 | 新增铁律 **11** + **LSN-037**（**多级设置页的卡片间距/内边距必须一套组件一个口径**）。来源：用户连报两轮「设置页和子页的卡片间距不统一」「内边距也不统一，以设置页的为准」。两个缺口形态不同：**卡间距** = 子页卡片无 `margin.bottom`、全靠下一张卡的 `top` 隔开，而那个 `top` 比主页小 ⇒ 永远更紧；**内边距** = 子页组件按「有无标题」分了档（有标题 3/3、无标题 6/6）⇒ 带标题的卡上下窄 **3vp**，恰在肉眼可辨量级。判据要点：**必须严格一致的是「跨页同一视觉语言」（间距/内边距/圆角/材质档位）；允许不同的是「对齐自己那一侧内容」的缩进** —— 本例 Divider 左缩进主页 52（项带 32vp 图标）vs 子页 12（无图标）**是正确的**，一起统一反而错位。⚠️ **给同一元素做「按场景微调」前先算差值能不能被看见**（<2vp 不可辨、>4vp 明显 ⇒ 不该分档）。⚠️ 排查姿势：数值封在组件里 ⇒ `grep -rn "<组件名>" --include=*.ets` 下钻对比 `margin/padding/Divider`，并先确认没有页面覆写。坑点速查表 +1 行 |
 | **v1.3.9** | 2026-09-30 | 新增 **LSN-031**（**Canvas 自绘正文「长按划选」+ 功能面横向铺开**）。来源：Icey-Reader 用户要求「照着 legado 把该做的功能都做了」——阅读页**一轮补齐** 书签 / 笔记 / 划选 / 书内搜索 / 阅读统计 / 书架分组 / 排版扩展，全部**用鸿蒙特性（沉浸光感 / 符号 / 系统组件）**实现。核心坑五条：<br>① **Canvas 字符命中**（最易写错）：**禁比例估下标**，走**三层收敛** —— `localX/px2vp − 页边距` ⇒ 页内容区；按行 y 区间定位行（`行高 = 字号 × lineSpacing`，**标题行字号 +2**）；行内找**最后一个左缘 ≤ cx** 的字形、过其右缘中点 +1 ⇒ 章内偏移 `line.charStart + idx`。★ **排版期必须存每行 `charStart`**，交互期无法反推。<br>② **划选与翻页同一手势分流**：复用既有 `PanGesture`（`selecting` 态改作 `extendSelect`，否则翻页），❌ 不要新增第二个 Pan / 手势组（会争抢成"想选字却翻页"）；进入划选用 `LongPressGesture({repeat:false,duration:400})`，退出后**直接 return 不再触发翻页**。<br>③ **划选底衬逐行画**：选中区间是**章内偏移**、绘制在**当前页**坐标系 ⇒ 求行 ∩ 区间的交集后逐行 `fillRect`（accent alpha≈0.22，叠在文字之下）；直接拿 `selStart/selEnd` 当 x/y 会跑到页外。<br>④ **跨页返回先问 `has`**：管理页可能从**书架→详情页**进入，栈里没有阅读页 ⇒ 一律 `pop()` 退到错页；正解 `AppRouter.has(ROUTE_READER) ? pop() : push(ROUTE_READER, bookUrl)`。多个入口**共用一条 `@StorageLink` 信号**，`@Watch` 消费后**立即清空**。<br>⑤ **功能面横铺三必查**：`$r('sys.symbol.xxx')` 先核 `id_defined.json`（写错**不报错只渲染空白**，本轮实测存在 `bookmark`/`bookmark_fill`/`bookmark_notepad`/`magnifyingglass`/`timer`/`folder`/`trash` 等，**不存在** `bookmark_square`/`note_text`/`highlighter`/`chart_bar`/`text_quote`/`pencil`）；单文件同模块**只写一行 import**（拆两行视同重复声明）；**新成员写到 struct 的 `}` 之后会引发几十条级联假错误**（`Property 'xxx' does not exist` + `UI component 'Column' cannot be used in this place`），元凶在报错点之外 ⇒ 扫「独占一行的 `}`」定位提前闭合处（实证 615 行），**别逐条改**。<br>坑点速查表 +3 行。附：划选浮动条/长按菜单**只放文字项**、破坏性红色（§2 UI 口径） |
 | **v1.3.8** | 2026-09-30 | 新增 **LSN-030**（**存 URI 不复制文件 ⇒ 每次启动必须重新 `activatePermission`**）+ **修正 LSN-023 的误导性表述**。🔴 极难定位，症状 = 「**导入当次完全正常、杀进程重开就白屏**」，代码零报错、画布只剩一层底色。机理：① 本地书/音乐不拷进沙箱 ⇒ 仓库存**原始 URI**，靠 fileShare 持久授权直读；② `persistPermission` **跨重启不自动生效**，必须每次启动逐 URI `activatePermission`（LSN-023 旧文「picker URI 自带永久授权、persist/activate 仅作保险」**只在本次进程内成立**，已就地改正）；③ 漏掉 ⇒ `openSync` 抛 `13900001 EPERM` ⇒ catch 静默 return ⇒ 渲染层拿空内容 ⇒ 纯色白屏。<br>**正解（双保险）**：启动链路（`EntryAbility.startupReady`，数据仓库 init **之后**）`await BookRepo.activatePermissions()` + 读取路径 `FilePermission.ensureActive(uri)`。参考实现 `Icey-Player-Harmony/services/MediaScanner.ets:540`（注释原文「存原始 URI，重启后通过 activatePermission 恢复访问，不复制文件」，`:152/:624` 分批激活）。⚠️ 剪裁模板时「删掉没被引用的服务」极易把 `services/FilePermission.ets` 连带删掉，**务必保留**。<br>**配套确立「绝不静默失败」**：凡「内容读到空 ⇒ 界面整片空」的路径（记录缺失 / 目录为空 / **正文 0 字** / 排版 0 页 / 读文件抛异常）都必须落到 `@State loadError` + **可见错误态 + 重试入口**。这次白屏拖了两轮才定位，根因就是失败被静默吞掉。<br>坑点速查表 +2 行。来源：Icey-Reader 阅读器两次报白屏，前几轮误判在 canvas 尺寸 / 排版口径 / px2vp，真因是剪裁模板时漏抄权限激活 |
-| **v1.3.7** | 2026-09-29 | 新增 **LSN-029**（`.gitignore` 签名约定）+ **修正内置模板** `../assets/template/.gitignore`：其第 13 行原为**裸 `signing/`** ⇒ 整个签名目录被忽略，仓库里没有 p7b/cer/p12/csr，`git status` 里也永远看不见（极易漏提交）。后果 = 新机器 clone 后构建不出可安装包（`unsigned.hap` / 安装报 `9568320 no signature file`），签名类问题（`00303074`）无法复现。<br>**定案规则**：签名材料**必须进仓库**，只忽略 `/signing/material/` 与 `/signing/debug/material/`（hap-sign-tool 哈希命名中间缓存，可重建）。⚠️ 两条都要写 —— 参考项目（Icey-Player-Harmony）只写了 `/signing/material/`，漏掉 `signing/debug/material/`。⚠️ 验证口径：`git check-ignore <目录>` 对目录判定**不可靠**，一律用 `git status --porcelain` + `git ls-files \| grep material`。<br>坑点速查表 +1 行。来源：Icey-Reader 照抄模板导致签名被整体忽略，用户复核 commit 时纠正「不用 ignore 签名 / material 是要忽略的」 |
+| **v1.3.7** | 2026-09-29 | 新增 **LSN-029**（`.gitignore` 签名约定）+ **修正内置模板** `../assets/template/.gitignore`：其第 13 行原为**裸 `signing/`** ⇒ 整个签名目录被忽略，仓库里没有 p7b/cer/p12/csr，`git status` 里也永远看不见（极易漏提交）。后果 = 新机器 clone 后构建不出可安装包（`unsigned.hap` / 安装报 `9568320 no signature file`），签名类问题（`00303074`）无法复现。<br>**定案规则**：签名材料**必须进仓库**，只忽略 `/signing/material/` 与 `/signing/debug/material/`（hap-sign-tool 哈希命名中间缓存，可重建）。⚠️ 两条都要写 —— 参考项目（Icey-Player-Harmony）只写了 `/signing/material/`，漏掉 `signing/debug/material/`。⚠️ 验证口径：`git check-ignore <目录>` 对目录判定**不可靠**，一律用 `git status --porcelain` + `git ls-files \| grep material`。<br>坑点速查表 +1 行。来源：Icey-Reader 照抄模板导致签名被整体忽略，用户复核 commit 时纠正「不用 ignore 签名 / material 是要忽略的」。<br>**⚠️ 2026-10-17 终版反转**：material **不提交**（换设备重输密码后重新生成，v1.4.1 的「material 必须进仓库」作废）；并补**跨应用复用**口径——换应用只换 p7b，cer/p12/csr 跨 Icey 系通用；明文密码绝不记录（build-profile 里只有密文）。终版全文见 LSN-029 |
 | **v1.3.6** | 2026-09-18 | 扩充 **LSN-025**（实色大卡改多卡光感），补两条"改版后才暴露"的规则：<br>① **只读内容块（备注 / 说明正文）同样要"承载"**：玻璃卡面上直接铺一段正文，深浅两色下都可能不够清晰 ⇒ 应套一层与输入框**同款容器**（`surface` 底 + `borderRadius 12` + `0.5vp colors.fieldBorder` 发丝描边）。附带好处："同一份内容在表单页是 `TextArea`、在详情页是同款承载"，视觉语言一致、切换无割裂。<br>② **详情 / 只读页的字段为空时不要整块隐藏**：`if (hasNote) { 备注卡 }` ⇒ 用户**分不清"没填"还是"不支持"**。本工程实证：详情页备注卡原为"无备注不渲染"，用户随即报「详情页要能显示备注」。正解 = 字段卡**常驻** + 空值占位文案（「暂无备注」）——"这一栏存在"本身要被表达出来。⚠️ 与表单/编辑页**相反**：表单页空字段不渲染更清爽，因为没有"这一栏存在与否"的疑问。<br>坑点速查表 +1 行（只读页空字段） |
 | **v1.3.5** | 2026-09-18 | 新增 **LSN-028**（**同一组件「点击 + 长按」+ 详情页自动刷新**）。三个坑都**编译全绿、仅真机暴露**：<br>① **`.onClick` 与 `.gesture(LongPressGesture)` 并存 ⇒ 双跳**：长按命中后抬手又触发点击 ⇒ 路由栈连进两页（用户看到"长按后莫名跳转"）。正解 = **互斥手势组** `GestureGroup(GestureMode.Exclusive, LongPressGesture({duration:500}).onAction(...), TapGesture({count:1}).onAction(...))`（独占模式"先满足条件者胜出"）；❌ 不要 `GestureMode.Parallel`（两个都触发）、❌ 不要叠两个 `.gesture()`。<br>② **子页"外部数据变更后不刷新"**：把重算结果放**普通字段缓存**、在 `build()` 里读 ⇒ 刷新链尾段变成"父组件重渲染**会不会顺带重跑 `@Builder`**"这一**不确定行为**；症状 = 编辑保存返回仍是旧值、**退出重进才对**（极易被误判为"没问题"）。正解 = **`@State` 持有视图模型 + `@Watch` 驱动重算**（`@Watch` 必须写在状态装饰器**之前**，LSN-012），并**入参只取 id、不持有快照**（页面永远 `repo.find(id)`；返回 `null` ⇒ 渲染「记录不存在」兜底卡，**不要在 build 里 pop**）。视图模型可以是页面内私有 class（同 `SegmentsParams` 范式），但**不许复算业务**（口径仍归 model，LSN-015）。<br>③ **`ForEach` 的 key 只写"身份"不写"值"** ⇒ "项还在、值变了"（如明细行的"已使用 / 目标成本 / 已存金额"）**key 不变 ⇒ 复用既有节点、不重跑 `@Builder`** ⇒ 永远停在旧值，是三者中最隐蔽的。正解 = key 带上会变的值（`kv_${label}_${value}_${accent}_${isLast}`）；列表页 key 再带 `_${this.assetsVersion}` 作双保险。<br>坑点速查表 +3 行（点击+长按 / 子页刷新 / ForEach key）。来源：AssetDailyCost「卡片改为长按编辑」后紧接着「点击卡片可以查看详情」，一轮内三坑齐现 |
 | **v1.3.4** | 2026-09-18 | 新增 **LSN-027**（**长按手势**）：把「点击」改成「长按」时，`Stack` / `Column` 等容器**没有 `.onLongPress` 修饰符**——写 `.onLongPress(() => {...})` 报 `10505001 Property 'onLongPress' does not exist on type 'StackAttribute'`（换 `Column` 报 `'ColumnAttribute'`）。正确写法 = **`LongPressGesture` 描述符 + 容器根节点 `.gesture(LongPressGesture({ duration: 500 }).onAction(() => {...}))`**。⚠️ 连环坑：`LongPressGesture` 是 ArkUI **全局声明、无需 import**，试图 `import { LongPressGesture } from '@kit.ArkUI'` 会报 `10311006 'LongPressGesture' is not exported from Kit '@kit.ArkUI'`。含：挂载点选择（根容器；`hitTestBehavior(HitTestMode.None)` + `enabled(false)` 的材质承载层不拦截手势）、`.gesture()` 默认 `GesturePriority.Normal` 与宿主 `List` 滚动手势共存的原理（"按住不动"与"位移"判定互斥）、`repeat: true` 适用场景。并给出**「点击改长按」口径变更规范**：`.onClick` 整段替换为 `.gesture(...)`、回调属性**同步改名**（`onCardTap` → `onLongPress`）让调用点漏改即编译失败、复用组件把回调做成**带默认空实现的可选属性**（不传零副作用）。坑点速查表 +1 行（素材来源：AssetDailyCost 列表卡改长按编辑，连报两种编译错误后定稿） |
@@ -1651,4 +1981,4 @@ HarmonyAppTemplate/
 
 ---
 
-*鸿蒙 App 模板基建 v1.3.9 | 内置模板，换机即用 | 读模板 → 按工作流剪裁 → 按铁律改代码 | 改前先看 §2，改后先过 §7，新建工程先扫附录 C*
+*鸿蒙 App 模板基建 v1.3.12 | 内置模板，换机即用 | 读模板 → 按工作流剪裁 → 按铁律改代码 | 改前先看 §2，改后先过 §7，新建工程先扫附录 C*

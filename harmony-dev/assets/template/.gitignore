@@ -11,10 +11,11 @@
 **/.test
 /.appanalyzer
 
-# ===== 签名文件：**不忽略，随仓库版本化**（务必不要写成 `signing/`）=====
-# p7b / cer / p12 / csr 是"工程可复现构建"的一部分，必须进仓库；
-# 整体忽略会导致新机器 clone 后编译不出可安装包、也无法复现签名问题（00303074）。
-#
-# 例外：material/ 是 hap-sign-tool 生成的哈希命名中间缓存，每次构建可重建，不版本化。
+# ===== 签名：打包文件全提交；material 不提交；密码只存密文（务必不要写成裸 `signing/`）=====
+# p7b / cer / p12 / csr 是"工程可复现构建"的一部分，必须进仓库；整体忽略会导致
+# 新机器 clone 后编译不出可安装包、也无法复现签名问题（00303074）。
+# material 不提交：换设备重输密码后重新生成（2026-10-17 终版，LSN-029）。
+# 明文密码绝不记录 —— build-profile.json5 里只有密文，随仓库走。
+# 换应用：只换 .p7b（profile 按 bundleName 绑定），cer/p12/csr 跨项目通用。
 /signing/material/
 /signing/debug/material/
