@@ -145,3 +145,13 @@ hdc shell aa start -b <bundle> -a <ability> --ps <key> <value>                  
 ```
 - 隐式失败 `10103101` = action 不匹配；`10104001` = ability 名错（先 dump 查真名）；
 - "拉起成功但落首页" = 目标应用不消费 uri 参数 ⇒ 该应用无页面级深链，改走分享链接/浏览器。
+
+## 7.5 ⚠️ 同形多分支的属性链必须逐项复制（2026-10-17 Player 实报「文字缩进提前」）
+
+给"同一元素的多渲染分支"加新分支（如 `iconSymbol` 系统符号 vs `icon` SFIcon SVG）时，
+**新分支的通用属性链必须从既有分支逐项复制后再改差异点** ——
+漏掉的往往是"不起眼"的间距/透明度类属性（本例漏 `.margin({ right: 12 })`，
+图标↔文字间距归零 ⇒ 文字左移 12vp，真机读作"缩进提前"；编译不报）。
+
+**复核手法**：正则提取两分支完整属性链（`.width/.height/.borderRadius/.backgroundColor/
+.alignContent/.margin/...`）逐项 diff，差异只允许是"渲染本体"那一处。

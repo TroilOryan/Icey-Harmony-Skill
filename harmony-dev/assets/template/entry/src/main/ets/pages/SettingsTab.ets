@@ -40,7 +40,7 @@ export struct SettingsTab {
       List({ scroller: this.scroller, space: 16 }) {
         // 顶部留白（避让标题栏；内容滚动后自然滑进模糊带）
         ListItem() {
-          Row() {}.height(SafeArea.top + 64)
+          Row() {}.height(SafeArea.top + 72)
         }
 
         // 通用组（子页路由模板）

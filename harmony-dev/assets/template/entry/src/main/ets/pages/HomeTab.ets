@@ -25,7 +25,7 @@ export struct HomeTab {
       List({ scroller: this.scroller, space: 12 }) {
         // 顶部留白（避让标题栏；内容滚动后自然滑进模糊带）
         ListItem() {
-          Row() {}.height(SafeArea.top + 64)
+          Row() {}.height(SafeArea.top + 72)
         }
 
         // 示例卡片：组件演示入口

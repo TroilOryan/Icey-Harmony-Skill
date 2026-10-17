@@ -25,9 +25,10 @@ export struct SettingsSubPage {
   build() {
     SubPageScaffold({ title: '设置子页' }) {
       List({ space: 0 }) {
-        // 顶部留白：SafeArea.top + 64（状态栏 + MINI 标题栏 + 间距；禁硬编码 112）
+        // 顶部留白：SafeArea.top + 72（状态栏 + MINI 标题栏 56 + 16；禁硬编码 112）
+        // 公式：Blank(safeAreaTop + 72) + 首卡自带 top(12) = 84 = 模糊带下缘(56 + 28)
         ListItem() {
-          Row() {}.height(SafeArea.top + 64).width('100%')
+          Row() {}.height(SafeArea.top + 72).width('100%')
         }
 
         // 分组一：开关组（带分组标题；项间手动插 Divider）

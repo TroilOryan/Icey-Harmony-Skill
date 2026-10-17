@@ -222,6 +222,26 @@ List() {
 ```
 ⚠️ 用这条路时 `ScrollToIndex` 的索引要 +1（spacer 占了 `[0]`）。
 
+⚠️ **选了这条路就不要再手动滚到"当前项"**：用户很自然的下一步诉求是"打开时定位到当前项"
+（如目录面板高亮当前章）——
+
+```ts
+// ❌ 在 show 刚置 true 的同一帧滚：面板还没拿到最终高度
+//    （constraintSize 上限依赖面板实际高）⇒ scrollToIndex 被当成"目标超出视口"落空
+//    ⇒ 现象是"打开了但没居中"
+// ✅ 延迟到面板升起完成再滚（240ms ≈ bindSheet 标准升起时长；onDisappear 兜底是 300ms）
+private centerOnCurrent(): void {
+  if (this.tocIndex < 0) return;
+  const sc = this.scroller;                  // ⚠️ 先取引用：setTimeout 里 this 可能已销毁
+  const target = this.tocIndex + 1;          // ⚠️ +1：spacer 占了 [0]
+  setTimeout(() => {
+    if (this.disposed || !this.show) return; // 关掉了就别滚（滚动会报错/无意义）
+    sc.scrollToIndex(target, true, ScrollAlign.CENTER);
+  }, 240) as number;
+}
+// ⚠️ 调用点必须在 `show = true` **之后**（同一行里 show 先、居中后），别漏了这个调用
+```
+
 ### 为什么四周留白必须放在「内容层」而不是「面板层」
 Scroll 视口 = **面板整宽 + 面板整高** ⇒ 两个收益：
 1. **横向**：浮动件（搜索胶囊、带材质的卡片）的**外阴影/光感**有余量可落，不再被视口边缘裁掉；
@@ -241,6 +261,33 @@ Scroll 视口 = **面板整宽 + 面板整高** ⇒ 两个收益：
 - 内容自带底色/卡片会把**面板材质盖死**，标题区与内容区观感分叉；
 - 「卡片途中突然出现一个浮层」在滚动手感上是两层容器；
 - ⚠️ **去卡片化后，各弹窗行内为「卡片内缩」加的 `padding({left:16,right:16})` 必须清零**，否则与内容层的 `PANEL_PAD_H(16)` 叠成 32vp。
+
+### ⚠️ 不走 SheetContainer 的弹窗：必须自付标题避让（2026-10-04 实证，静默失败）
+
+⚠️ 这是自绘浮层标题**最容易被漏掉**的一条，而且**不报错、不崩**，只是打开时"标题压着一块内容"。
+
+**机制**：浮层不占布局高度（见二、组件骨架）⇒ 避让职责被下放到 `SheetContainer` 内容层顶部
+`padding(top: SHEET_TITLE_AREA_VP(64) + PANEL_PAD_V(12) = SHEET_CONTENT_TOP_VP 76)`。
+**不走容器的弹窗就自动失去这 76vp。**
+
+**四条铁律**
+
+1. 走 `SheetContainer`（默认）→ 避让自动具备，**不要自己再加顶白**（会双份留白）。
+2. 刻意不走容器的弹窗（历史原因，如"卡片直接浮在面板底上"的去卡片化观感）⇒
+   **必须自己补 `top: SHEET_CONTENT_TOP_VP + PANEL_PAD_V`**，否则静止态首行内容落在
+   `top:12` 附近，被 76vp 标题浮层压住。
+3. 自管内容布局的弹窗还要用 `sheetPanelMaxHeight(...)` 封顶（同一份口径就是为这类弹窗导出的）。
+4. 底栏在容器外时**必须**传 `bottomSpace: footerHeightOf(n)`，否则底栏被顶出屏幕。
+
+**30 秒排查**（列出所有"有标题但没碰容器"的可疑弹窗）：
+
+```bash
+grep -l "sheetTitle: '" -r entry/src/main/ets --include=*.ets | xargs grep -L "SheetContainer"
+```
+
+**实战案例**：`VipPage` 会员方案弹窗 —— 2026-10-02 为"方案卡直接浮在面板底上"刻意不走容器，
+只留 `top: 12` ⇒ 标题"选择会员方案"压住首张方案卡顶边。修法一行
+`top: SHEET_CONTENT_TOP_VP + PANEL_PAD_V`（12 个弹窗宿主里**仅此一处**是"有标题 + 不走容器"）。
 
 ## 四、标题边缘渐变模糊（核心调参）
 
@@ -301,6 +348,46 @@ export const SHEET_HEADER_BAND_VP = SHEET_CONTENT_TOP_VP;               // 浮�
 （= 直接转发 `blurStops`）**，给**自己管布局、不走 `SheetContainer`** 的弹窗复用
 （本仓 = `DownloadImportSheet` 那份 320 高的 `List`）。
 ⇒ 调用点：容器内用 `blurStops`、容器外用 `blurStopsFor`，**别只导出一个、也别各写一份**。
+
+⚠️ **第三种形态：整页列表（不是弹窗）也要"滚到标题带下面被糊住"** ——
+弹窗那两条（`blurStops` / `blurStopsFor`）的带长都由 `blurBandVp(视口高)` **反推**，
+隐含前提是「内容静止留白只有 `SHEET_TITLE_AREA_VP`（64vp）」。**整页列表不是这个形态**：
+它的标题带 = `SafeArea.top + 标题栏实体高 + 标题栏扩展区`（例：搜索页 `38 + 72 + 56 + 36 = 202vp`）
+⇒ 沿用弹窗带长（封顶 96）会在 96 处归零，而静止首行还在 202 ⇒ **标题下那 100+vp 永远清晰**，
+读作「模糊没做完」。
+
+**正解 = 带长由调用方显式给出（= 该页顶部静止留白）**，曲线沿用同一条：
+
+```ts
+// Icey-Reader 已导出（SheetContainer.ets）
+export function blurStopsForBand(bandVp: number, componentHeight: number): FractionStop[] {
+  const h = componentHeight > 0 ? componentHeight : SHEET_BLUR_BAND_VP * 2;
+  const cap = h * SHEET_BLUR_BAND_RATIO;          // 仍保留"≤42% 视口高"保护
+  let band = bandVp > 0 ? bandVp : SHEET_TITLE_AREA_VP;
+  if (band > cap) band = cap;
+  let minBand = h * 0.02;                          // 极矮视口下限
+  if (minBand > SHEET_TITLE_AREA_VP) minBand = SHEET_TITLE_AREA_VP;
+  if (band < minBand) band = minBand;
+  let frac = band / h;
+  if (frac > 1) frac = 1;
+  const blur: number[] = [1, 1, 0.9, 0.68, 0.44, 0.22, 0.06, 0.015, 0];
+  const curve: number[] = [0, 0.16, 0.28, 0.4, 0.52, 0.64, 0.76, 0.88, 1];
+  const stops: FractionStop[] = [];
+  for (let i = 0; i < curve.length; i++) {
+    let pos = frac * curve[i];
+    if (pos > 1) pos = 1;
+    stops.push([blur[i], pos]);
+  }
+  return stops;
+}
+```
+
+⚠️ **`bandVp` 必须是"内容静止时首行所在的 y"**（= 那个 spacer item 的高）。
+写错方向的两个后果都很难看：给小了 ⇒ 糊住静止首行；给大了 ⇒ 标题下留一段清晰带。
+
+⚠️ **带长与"留白放在哪"是同一件事的两面**：带长按 spacer 高给，而 spacer 必须是
+**滚动容器的第一个 item**（不能是内容层 padding，否则滚动行程被吃掉、内容压根滚不到标题下）。
+见 `harmony-app-template` 铁律 **10f**。
 ```ts
 const blur: number[] = [1, 1, 0.9, 0.68, 0.44, 0.22, 0.06, 0.015, 0];
 const frac: number[] = [0, 0.16, 0.28, 0.4, 0.52, 0.64, 0.76, 0.88, 1];
@@ -374,6 +461,12 @@ private titleBandStops(): [ResourceColor, number][] {
 ///   —— 因为它是「弹窗面板观感底色」这类**跨组件口径**，不属于任何单个弹窗组件；
 ///   目前唯一消费者是 `AppSheet.titleBandStops()`（窄屏浮层标题带渐变基色）。
 ///   **判据**：口径若会被两个以上地方用到、或语义上不属于某个组件 ⇒ 一律放服务层/管理器，别塞进组件私有方法。
+///   · player 落在 `SettingsManager.sheetSurfaceColor()`（静态方法）；
+///   · Icey-Reader 落在 `ThemeManager.sheetSurfaceColor`（**静态 getter**，2026-10-04 实测）
+///     —— 该工程的主题色板口径本就在 `ThemeManager`（`colors` / `opaqueBackground` 都在它上面），
+///     口径跟着**已有归属**走即可。**唯一红线是别塞进组件私有方法**（否则第二个弹窗组件要用时必然复制）。
+///   ⚠️ 引入 `isImmersiveMaterialSupported()`（决定材质是否可用）到 `ThemeManager` 前先确认无循环依赖：
+///     本工程 `ThemeManager` **无任何 import**，而 `SystemMaterial` 只依赖 `@kit.ArkUI` + `AppLogger` ⇒ 安全。
 
 // SettingsManager.ets
 static sheetSurfaceColor(): string {
@@ -383,7 +476,7 @@ static sheetSurfaceColor(): string {
 ```
 
 四条要点：
-1. **多档曲线（7 档），不要两/三档折线** —— 折线在档位之间仍是**线性突变**，多档逼近曲线后肉眼才看不出分段。
+1. **多档曲线（8 个档位），不要两/三档折线** —— 折线在档位之间仍是**线性突变**，多档逼近曲线后肉眼才看不出分段。
 2. ⚠️ 位置档 **0 / .2 / .36 / .5 / .62 / .72 / .78 / 1** 用的**比例区间要与内容层 `blurStops()` 的模糊衰减对齐**（同一组 0~1 节奏），两边**各自逐档归零**：本带在 0.78（≈59vp）处已全透，模糊在 96vp 处收到 0 ⇒ 内容起点（76vp）到带尾这段是"无底色 + 模糊已极弱"的收尾区，**没有台阶**。
    ⚠️ 带长从 120 收到 76 时**档位必须同步重排**（位置是比例，沿用长带那组会把不透明段同比压扁）。
 3. ⚠️ 透明档**必须保持同一 RGB**（只降 alpha）—— 混色会重新"变实"、把模糊感压掉。
@@ -691,6 +784,61 @@ export class SheetManager {
 | `PlayMediaSheetHost` / `PlayOutputSheetHost` | 播放页 | `@Link show`（Index 控制）；**各自只挂 1 个** bindSheet |
 | `RedeemCodeSheetHost` | — | 单 bindSheet |
 
+### 10.7 「二级跳转」= **同一个弹窗内换内容**，绝不是"关一个再开一个"（2026-10-03 定案）
+
+> 用户原话：「如果**从排版进入一些二级界面**的话 参考 player skill 要加入**二级跳转**」。
+
+**错误实现**：一级面板里点「亮度」→ `showStyleSheet = false; showBrightnessSheet = true;`
+⇒ 用户看到**落下 + 升起两段动画**、中间还夹一帧空屏。那不是跳转，是"关一个再开一个"。
+
+**正确实现**（同一宿主 + 两个状态字段区分"当前层"与"本次入口层"）：
+
+```ts
+@State showSettingsSheet: boolean = false;   // ⚠️ 三/多个面板共用一个 show
+@State settingsStack: string = 'style';      // 当前层（决定渲染哪块内容 + 标题）
+@State settingsRoot:  string = 'style';      // 本次打开时的入口层（决定有无返回按钮）
+
+// 一级入口（底部工具条）：root === stack ⇒ 无返回按钮
+openSettingsSheet(panel) { this.showMenu = false; this.settingsRoot = panel;
+  this.settingsStack = panel; this.showSettingsSheet = true; }
+// 二级跳转：只换 stack，show 不动 ⇒ 面板保持升起、内容横切、返回按钮出现
+pushSettingsPanel(panel) { this.settingsStack = panel; }
+private get onSecondLevel(): boolean { return this.settingsRoot !== this.settingsStack; }
+```
+
+| 要点 | 说明 |
+|---|---|
+| **一个 `show` 驱动多个面板** | `bindSheet` 的 `show` 若由多个 `@State` 驱动 ⇒ 切面板时各自触发一次显隐 = **闪烁/重入** |
+| **`root` 与 `stack` 必须分开** | 底部工具条的「亮度」「主题」是与「排版」**平级**的独立入口 ⇒ 直接打开时 `root === stack`、**不该有返回按钮**；只有"从排版里点进去"才有 |
+| **返回按钮的出现条件是 `onSecondLevel`** | 不是"面板名 ≠ 'style'" —— 否则从工具条直开亮度也会莫名其妙多个返回箭头 |
+| **返回键要退一级而不是关弹窗** | 在 `onWillDismiss` 拦 `DismissReason.PRESS_BACK` 调 `onBack()`，**不调 `action.dismiss()`**（见第八节） |
+| ⚠️ **`showBack` 为真时浮层必须画** | 条件是 `sheetTitle.length > 0 \|\| showBack` —— 只判标题会让无标题的二级面板**连着返回按钮一起消失**，用户被困在二级视图里出不来 |
+
+### 10.8 面板内**行的样式口径**统一到 `SettingItem`（否则"看着不统一"）
+
+> 用户原话：「**排版里面的项目样式感觉不大统一**」。
+
+同一个面板里若混着「`SettingItem` 组件」与「自绘 `Row`」，很容易出现**两套行口径** ——
+自绘那几行往往少了 `minHeight` / `borderRadius` / 横向内缩，于是**文字左缘对不齐、行高忽高忽低**
+（用户读作"不统一"，而不是"少了内边距"）。
+
+统一口径（**`SettingItem` 与本项目自绘行都照这一份抄**）：
+
+| 属性 | 值 |
+|---|---|
+| 最小行高 | `constraintSize({ minHeight: 48 })` |
+| 圆角 | `borderRadius(12)` |
+| 内边距 | `{ left: 12, right: 12, top: 6, bottom: 6 }` |
+| 标题 | `fontSize(16)` + `FontWeight.Medium` |
+| 垂直对齐 | `alignItems(VerticalAlign.Center)` |
+
+⚠️ 两类行的**特例**：
+- **步进器行**（如「字号 `A-` `12` `A+`」）：它本身就是"调节器"不是"单选"，**保留按钮形态**，
+  但行高/内缩/标题字号必须与其它行一致；
+- **底部信息行**（如「本章共 N 字 / 复制本章」）：它是"信息 + 行内动作"、**不可点** ⇒
+  不带 `onClick`、不参与按压反馈，但**行高与横向内缩仍必须一致**（否则同面板混两套边距）。
+  它可读作"矮一截、松一截"，用户照样会归到"不统一"里。
+
 ## 十一、调用清单（改造一个项目的弹窗要动的地方）
 
 1. **识别全部宿主链路** —— 常见有三条：① 通用 `AppSheet`（bindSheet）② 项目特有单宿主多面板（如 `ReaderSheetHost`）③ **历史遗留的手写 `bindSheet` 调用点**。第三条会因"标题上移到宿主浮层"而**丢标题** ⇒ 必须并入 `AppSheet`。
@@ -732,6 +880,9 @@ export class SheetManager {
 | 宽屏 dialog `backgroundColor` 透明 | 「**白面板 + 黑卡片**」 | 改 `opaqueBackground` |
 | 用 `shouldDismiss` | **拿不到关闭原因**，返回键分不出来 | 改 `onWillDismiss` |
 | 返回按钮用 `.padding()` 撑命中区 | 被**推出**标题行 | 用 `width/height` 撑 |
+| 二级面板用"关一级 + 开二级"两个 `show` | 落下 + 升起两段动画、中间夹一帧空屏 | 单宿主 + `stack`/`root` 两字段换内容（第 10.7 节） |
+| 浮层只判 `sheetTitle.length > 0` | 无标题的二级面板**连着返回按钮一起消失**，用户出不来 | 条件加 `\|\| showBack`（第 10.7 节） |
+| 同一面板内混用 `SettingItem` 与自绘行、各行 padding 不一 | 「**排版里面的项目样式感觉不大统一**」——文字左缘对不齐、行高忽高忽低 | 全部对齐 `SettingItem` 口径：`minHeight 48` + `borderRadius 12` + `padding {left:12,right:12,top:6,bottom:6}` + 标题 `16 / Medium`（自绘行也照抄，见第 10.8 节） |
 | 返回按钮只放一个裸 chevron | 「**没有和关闭按钮垂直居中** 和**做光感按钮效果** **大小尺寸也注意对齐**」——与带圆形背板的关闭按钮**不像一套** | 做成圆形 + 光感按钮（结论 6.5、第八节） |
 | 光感承载层外层没 `.clip(true)` | 底盘圆角外露出**方角** | `.clip(true)` |
 | 光感承接层开了却在上面叠不透明底/模糊 | 材质被盖死 / 发灰 | 材质接管时底色透明、不叠 `backgroundBlurStyle` |
