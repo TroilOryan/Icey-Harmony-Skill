@@ -20,7 +20,8 @@
 - 横幅 **等比 16:9**：`width('100%') + aspectRatio(16/9) + ImageFit.Contain`；
   圆角 12；**不要固定高度 + Cover**（会裁掉素材上下画面，真机复验实锤）；
 - 「点击查看>>」= accent 色 13 号 Medium——它是**整卡点击**的入口文案（参考竞品语义）；
-- **整卡 `onClick`**，不是只给按钮挂点击。
+- **整卡 `onClick`**，不是只给按钮挂点击；
+- 卡片底色**不要写实色**——三级背景（沉浸光感）见 §2.6。
 
 ## 2. ⚠️ 卡片宽度铁律（溢出返工的根因，Icey-Reader 真机实锤）
 
@@ -69,6 +70,58 @@
   不管上没上架都直接换 id 配上——**上没上架不用管**（"这几个应用是确认上了"只是告知
   优先级，不是接不接的判据）。bundle 名对照：
   `com.icey.player`（Icey Player）/ `com.icey.reader`(冰沙阅读) / `com.icey.stars`(星空下)。
+
+## 2.6 ⚠️ 卡片背景 = 三级背景（沉浸光感），别写成实色底（2026-10-17 Player 补）
+
+初版卡片 `.backgroundColor(ThemeManager.colors.cardBg)` 实色 ⇒ **有壁纸时卡片读作"一块实心板"**，
+与设置卡片体系（`SettingsGroup` / `GlassCard`）不一致。用户 2026-10-17 原话：
+「友情应用的卡片是不是没有做光感卡片」。
+
+正解与设置卡片**完全同口径**（机制与坑见 `harmony-material-layer.md` 第三/四/五节）：
+
+| 条件 | 卡片底色 | 模糊 | 承载层 |
+|---|---|---|---|
+| 有壁纸 + API≥26 | `Color.Transparent`（材质接管） | `BlurStyle.NONE` | `MaterialLayer({ layerRadius: 卡片圆角, scope: 'menu', active: materialOn() })` |
+| 有壁纸 + 材质不可用 | `Color.Transparent` | `BlurStyle.COMPONENT_REGULAR`（透出壁纸） | 无 |
+| 无壁纸 | 实色 `colors.cardBg` | `NONE` | 无（无东西可透，透明 = 糊成一片） |
+
+```ets
+@StorageLink('settings_customBgUri') customBgUri: string = '';
+
+private materialOn(): boolean {
+  return this.customBgUri.length > 0 && SettingsManager.materialAvailable();
+}
+
+Stack() {
+  MaterialLayer({ layerRadius: 16, scope: 'menu', active: this.materialOn() })  // 圆角与卡片一致
+  Column() { /* 横幅 + 应用名 + 简介 */ }
+    .width('100%')
+    .padding(16)
+    .borderRadius(16)
+    .backgroundColor(this.materialOn() || this.customBgUri ? Color.Transparent
+      : ThemeManager.colors.cardBg)
+    .backgroundBlurStyle(this.materialOn() ? BlurStyle.NONE
+      : (this.customBgUri ? BlurStyle.COMPONENT_REGULAR : BlurStyle.NONE))
+    .onClick(() => { /* 整卡点击 */ })
+}
+.width('100%')
+.borderRadius(16)
+.clip(true)
+```
+
+- ⚠️ **内容区给 `Column` 直接挂 `systemMaterial` 无效**（日志 `Material inactive: out of scope`，
+  不报错不警告）⇒ 必须走 `MaterialLayer` 的 Toggle 绕过法：内容作为**兄弟节点**叠在承载层之上；
+- ⚠️ `scope` 显式传 **`'menu'`**——`MaterialLayer` 默认 `'search'`，会被「光感自动反色」夹薄、
+  挡位差异被抹平（切强/弱无感）；
+- ⚠️ `layerRadius` 必须等于卡片圆角（本例 16），否则卡角会露出材质自己的小圆角；
+- ⚠️ 材质接管时 `backgroundColor` 必须透明、`backgroundBlurStyle` 必须 `NONE`（材质自带模糊，
+  叠两层必发灰）；
+- §2 的宽度铁律不受影响：横向留白仍挂 `ListItem.padding`，`Stack` 只写 `width('100%')`；
+- 卡片内有图片时**图片圆角与卡片圆角各自独立**（本例横幅 12 / 卡 16），`clip(true)` 挂外层 `Stack`
+  防溢出。
+
+**验证**：开壁纸后卡片应与设置页卡片同观感，切强/平衡/弱三挡同步变化、无需重启；
+关壁纸回落实色、与页面背景拉得开层次（半透明兜底是"毛玻璃时代"写法，会让卡片与页面糊在一起）。
 
 ## 3. 跳转通道（三类，按目标应用是否可直达选）
 

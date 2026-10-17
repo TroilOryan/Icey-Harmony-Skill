@@ -42,9 +42,9 @@ harmony-dev/
 | **编译 / 验证 / 排错** | `harmony-offline-verify.md`、`harmony-arkts-lint-fix.md`、`harmony-screenshot-layer-forensics.md`、`harmony-log-probe-cleanup.md`、`binary-asset-protocol.md` |
 | **弹窗 / 菜单 / 抽屉** | `harmony-sheet-panel.md`、`harmony-titlebar-menu.md`、`harmony-side-drawer.md` |
 | **观感 / 材质 / 背景** | `harmony-material-layer.md`、`harmonyos-arkts-custom-background.md`、`harmony-system-loading.md`、`harmony-symbol-outline-to-pixelmap.md` |
-| **能力接入 / 专项** | `harmony-form-card.md`（两册合并）、`harmony-reader-kit-integration.md`、`harmony-canvas-frame-pacing.md`、`stellarium-viewport-alignment.md`、`stellarium-hips-landscape.md` |
+| **能力接入 / 专项** | `harmony-form-card.md`（两册合并）、`harmony-friend-apps-page.md`（友情应用推荐页）、`harmony-reader-kit-integration.md`、`harmony-canvas-frame-pacing.md`、`stellarium-viewport-alignment.md`、`stellarium-hips-landscape.md` |
 
-### 分册清单（19 册）
+### 分册清单（20 册）
 
 | 分册 | 用途 |
 | --- | --- |
@@ -64,6 +64,7 @@ harmony-dev/
 | `harmony-system-loading.md` | 加载态一律系统 `LoadingProgress`，禁自绘加载动画（用户定案） |
 | `harmony-symbol-outline-to-pixelmap.md` | 系统符号 `sys.symbol.*` 画进 PixelMap / 离屏位图 |
 | `harmony-form-card.md` | 桌面服务卡片（Form Kit）：三件套、数据注入、刷新、FormLink、背板透明（原两册合并） |
+| `harmony-friend-apps-page.md` | 应用内「友情应用」推荐页：横幅卡版式、**卡片三级背景（沉浸光感）**、市场直达、子页接线两处映射表 |
 | `harmony-reader-kit-integration.md` | 华为 Reader Kit 阅读内核接入：白屏、翻页裁切、单击不出工具栏 |
 | `harmony-canvas-frame-pacing.md` | Canvas 全屏自绘的帧率与跟手延迟诊断（打点口径 + 成本模型） |
 | `stellarium-hips-landscape.md` | Stellarium HiPS 实拍地景 → 离线烘焙等距圆柱全景 |

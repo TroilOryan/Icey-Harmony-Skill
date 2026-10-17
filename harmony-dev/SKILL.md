@@ -75,7 +75,7 @@ version: 1.0.0
 | 你要做什么 | 读哪册 |
 | --- | --- |
 | **桌面服务卡片**（Form Kit）：三件套、`form_config.json`、静态卡片数据注入、卡片不刷新、`FormLink` 点击、背板透明开放能力；**会员身份卡+自定义卡背景**、**设置云同步**（LWW/快照/白名单/接线） | **`references/harmony-form-card.md`**（两册合并版；第 8/9 章） |
-| **应用内「友情应用」推荐页**（多应用互推）：卡片版式、市场详情页直达（`store://`）、第三方深链边界、子页接线两处映射表 | **`references/harmony-friend-apps-page.md`** |
+| **应用内「友情应用」推荐页**（多应用互推）：卡片版式、**卡片三级背景（沉浸光感，别写实色底）**、市场详情页直达（`store://`）、第三方深链边界、子页接线两处映射表 | **`references/harmony-friend-apps-page.md`** |
 | 华为 **Reader Kit** 阅读器接入：白屏、翻页裁切、单击不出工具栏、底色/字号不生效、路由与沙箱路径 | `references/harmony-reader-kit-integration.md` |
 | **Canvas 全屏自绘性能**（星图/地图/仪表）：很卡、跟手延迟、分段打点全是 0、调用数 > 数据量 | `references/harmony-canvas-frame-pacing.md` |
 | 星图 **视野/投影/网格**口径对齐 Stellarium（fov 短边角 + 立体投影、离线量取角尺度） | `references/stellarium-viewport-alignment.md` |
