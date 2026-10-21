@@ -1,7 +1,7 @@
 > **分册：`harmony-app-template` 主册** ｜ 原独立技能 `harmony-app-template`，2026-10-03 合并进 `harmony-dev`。
 > 配套：`references/harmony-app-template/file-map.md`（文件职责表）、`references/harmony-app-template/workflows.md`（W1~W8 可复制代码）、`../assets/template/`（可移植模板工程副本）。
 
-# 鸿蒙 App 模板基建 v1.3.11
+# 鸿蒙 App 模板基建 v1.3.13
 
 > 📦 **本 Skill 自带模板工程副本**（`../assets/template/`，79 文件 / 1.2MB）——
 > 整个 Skill 目录拷到任何机器都能直接起新鸿蒙 App，不依赖外部工程。
@@ -295,7 +295,7 @@
 | 需要判断"刚刚那次操作前是什么状态"（如置顶后提示文案） | `repo.toggle(id)` 是 **in-place 翻转**，而调用方持有的 `actionTarget` 与 `find()` 返回**同一引用** ⇒ toggle 之后读 `actionTarget.pinned` 拿到的是**新值** ⇒ 刚置顶却提示「已取消置顶」（**文案与动作相反**，用户会报「显示反了」） | **翻转前把旧值存下来**：`const wasPinned = target.pinned; repo.toggle(id); toast(wasPinned ? '已取消置顶' : '已置顶')`。⚠️ 同一页面里"读新值"与"读旧值"两种写法都能自洽，但**必须只选一种并写注释说明**，混用必错 |
 | 要做「**上次退出时在哪，下次打开回到哪**」（阅读记忆 / 会话恢复） | 想用"记录时间戳 + 启动时判断是否够新"来区分"用户主动退出"与"进程被杀" —— 阈值怎么定都不对，且要额外的标志位与清理逻辑 | ⭐ **不需要任何时间戳/标志位：用「`aboutToDisappear` 在进程被杀时不执行」这个事实本身做判据。** 进页 `set(key, id)`、离页 `set(key, '')`；进程被杀 ⇒ 离页回调没跑 ⇒ 键**残留** ⇒ 下次启动正好命中"上次在页内"；用户自己返回 ⇒ 键已清 ⇒ 停在原位。★ **写/清必须在同一层成对**（写在 `@Entry` 宿主页的 appear/disappear，别跨层）<br>⚠️ 两个必须加的**硬闸**：① 恢复前判**数据仓已就绪**（未就绪时 `repo.find()` 恒 `null` ⇒ 会把有效会话**误判成已删除并清掉**，不可逆地毁掉自己的能力）；② 延迟恢复的窗口内**复检是否已在目标页**（用户可能已自己点进去了 ⇒ 无脑再进 = 开两份）。<br>⚠️ 恢复触发**要两路**（`@Watch('dataLoaded')` + `aboutToAppear` 尾部延迟），因为启动恢复可能在页面挂载**之前**就打完了标记 ⇒ **`@Watch` 对初始值不触发**、收不到那次变化（见铁律 35 / LSN-012） |
 | 撤掉一条"一镜到底 / 共享元素"通道时，机制要不要一起删 | 全删 ⇒ 下次要在**另一条路径**复用（用户原话「从列表到详情不用转场了，**从详情到阅读页才需要**」）时得重建整套曲线 / 置位 / DOM 配对机制；不删又怕留死代码被误用 | **分层决策**：① 先看新路径是否**具备落地条件** —— 若与已实证的硬约束冲突（如"共享元素要在页面根插层" vs "SDK 重组件必须**直挂**页面根"），则机制**整块保留**；② 保留时**必须把"写入端已归零"写进注释**（`HERO_TRANSITION_MS` 处注明"当前零调用方、恒 false ⇒ `pop()` 那条 branch 是死分支但无害"），避免后人误以为它在工作；③ **必须撤得干净的部分**：所有 `.geometryTransition` / `.transition` 绑定 + 各页 `@Prop heroEnter` + 骨架里的分支判据 —— 只撤一半会"起了手却没人播"（见 LSN-034 A） |
-| 新建工程/写 `.gitignore` 或把工程推上 Git | 照抄模板 `.gitignore` 的裸 `signing/` ⇒ **整个签名目录被忽略**，仓库里没有 p7b/cer/p12/csr；clone 到新机器构建不出可安装包（`9568320 no signature file`） | **签名打包文件全提交**（p7b/cer/p12/csr）；**material 不提交**（换设备重输密码后重新生成）；**明文密码绝不记录**（build-profile 里只有密文）。**换应用只换 p7b**，cer/p12/csr 跨 Icey 系通用（LSN-029 终版，2026-10-17） |
+| 新建工程/写 `.gitignore` 或把工程推上 Git | 照抄模板 `.gitignore` 的裸 `signing/` ⇒ **整个签名目录被忽略**，仓库里没有 p7b/cer/p12/csr；clone 到新机器构建不出可安装包（`9568320 no signature file`） | **签名打包文件全提交**（p7b/cer/p12/csr）；**material 不提交**（它是密码密文的**解密密钥**，入库即可还原密码；且换设备重输密码后各自重新生成）；**明文密码绝不记录**（build-profile 里只有密文）。**换应用只换 p7b**，cer/p12/csr 跨 Icey 系通用（LSN-029 终版，2026-10-17 + 2026-10-21 补安全理由） |
 | 详情/只读页的某个字段为空 | 整块隐藏（`if (hasNote) { 备注卡 }`）⇒ 用户**分不清"没填"还是"不支持"**（本工程实测：详情页备注卡「无备注不渲染」，随即被用户报「详情页要能显示备注」） | **详情/只读页的字段卡常驻**，空值给占位文案（「暂无备注」）——"这一栏存在"本身要被表达出来。表单/编辑页相反：空字段不渲染更清爽（没有"存在与否"的疑问）。备注等正文块要用与输入框同款承载（`surface` + 0.5vp `fieldBorder` 描边），别直接铺在玻璃上（见 LSN-025） |
 | 本地书/音乐"存入库、不复制文件"后**重启打不开**（导入当次正常、重开白屏/无声） | 只调了 `FilePermission.persist([uri])`，**没有每次启动 `activatePermission`**。持久授权跨重启不自动生效 ⇒ `openSync(原始URI)` 抛 `13900001 EPERM` ⇒ 读取 catch 静默 return ⇒ 画布/列表全空 | ① 启动恢复链路（`EntryAbility.startupReady`，数据仓库 init **之后**）加 `await BookRepo.activatePermissions()`（遍历全部 bookUrl 调 `FilePermission.activate`）；② 读取路径加 `FilePermission.ensureActive(uri)` 单条兜底。★ 指纹 = **导入当次能看、杀进程重开就白**；日志找 `13900001`/`EPERM`（见 LSN-030） |
 | 读取失败导致"整片空白"的页面（阅读页纯色、列表空态） | catch 里只 `AppLogger.error(...)` 然后 return ⇒ 用户看到一块底色，**没有任何提示**，长相差不多的根因（权限/文件移动/偏移错位）无法区分，排查几轮都在猜 | **绝不静默失败**：把失败落到 `@State loadError`，渲染**可见错误态 + 重试按钮**；并对"内容为空""排版 0 页"等**非异常**分支同样报错（见 LSN-030） |
@@ -1222,8 +1222,35 @@ ForEach(v.rows, (r: KvRow) => { this.kvRow(r) },
   |---|---|---|
   | `signing/debug/*.p7b` `.cer` `.p12` `.csr` | ✅ 进仓库 | 新机器构建可安装 HAP 的必要材料 |
   | `signing/release.*` | ✅ 进仓库 | 同上（发布链） |
-  | `signing/**/material/**` | ❌ **不提交** | 换设备重输密码后重新生成（提交它反而是噪音） |
+  | `signing/**/material/**` | ❌ **不提交** | 换设备重输密码后重新生成（提交它反而是噪音）+ **它是密码的解密密钥（见下）** |
   | `build-profile.json5` 里的**密码密文** | ✅ 随仓库走 | 密文安全；**明文密码绝不写进任何文件** |
+
+- **🔴🔴 material 绝不能入库的**安全**理由（2026-10-21 用户定案，补充口径）**：
+  此前只写了"换设备重输密码后重新生成"（**流程**理由），漏了**安全**理由 ——
+  **`material/` 就是 `build-profile.json5` 里那串密码密文的解密密钥本身。**
+
+  | 环节 | 位置 | 性质 |
+  |---|---|---|
+  | 密码**密文** | `build-profile.json5` 的 `storePassword` / `keyPassword`（形如 `0000001C…`） | 随仓库走，**这是安全的** |
+  | 密码**解密密钥** | `signing/**/material/`（`fd/{0,1,2}/<hash>` + `ac/<hash>` + `ce/<hash>`） | **绝不入库** |
+
+  ⇒ **密文 + 密钥同时入库 = 密码可被还原，等同明文泄露。**
+  只提交密文（不放密钥）⇒ 拿到仓库的人只能看到不可读的密文；密钥每台设备各自生成、互不共享。
+
+  **material 的生成位置（键目录规则）**：hvigor 用 `storeFile` 所在目录下的 `material/` 解密密文
+  ⇒ `signing/debug/debug.p12` ⇒ `signing/debug/material/`；
+  `signing/release.p12` ⇒ `signing/material/`。
+  ⚠️ 密文与 material **是配对生成的**：换设备重输密码后 DevEco 会重新生成该机的 material，
+  **密文也随之改变** ⇒ 换设备后 `build-profile.json5` 的密文需要重新生成（别指望密文能跨设备复用）。
+
+  **判定与自查**（提交前跑一遍）：
+  ```bash
+  git ls-files | grep material        # 权威：有输出 = 违规（应为空）
+  git check-ignore -v signing/debug/material/   # 看规则命中哪一行
+  ```
+  ⚠️ `git check-ignore <目录>` 对**目录路径**的判定不可信，用 `git ls-files` 验。
+  ⚠️ **只写 `/signing/material/` 会漏掉 `/signing/debug/material/`** ——
+  两条都要写（Icey-Player-Harmony 就踩过：只写了前者，5 个 material 文件长期在版本控制里）。
 
 - **⚠️ 跨应用复用（2026-10-17 用户：「换应用就是换 p7b 其他的都通用」）**：
   **同一套 cer / p12 / csr 跨所有 Icey 系应用通用**，换应用只需要**换 `.p7b`**
@@ -1951,6 +1978,7 @@ HarmonyAppTemplate/
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| **v1.3.13** | 2026-10-21 | **LSN-029 补 material 不入库的「安全」理由**（此前只有"换设备重输密码后重新生成"的**流程**理由）。★ 核心补充：**`material/` 就是 `build-profile.json5` 里那串密码**密文**的解密密钥本身**（`fd/{0,1,2}/<hash>` + `ac/<hash>` + `ce/<hash>`）⇒ **密文 + 密钥同入库 = 密码可被还原，等同明文泄露**；只提交密文（不放密钥）才安全，密钥每台设备各自生成、互不共享。同时补 **material 的生成位置规则**（hvigor 用 `storeFile` 同级 `material/` 解密 ⇒ `signing/debug/debug.p12` ⇒ `signing/debug/material/`；`signing/release.p12` ⇒ `signing/material/`）与**密文↔material 配对生成**的事实（换设备重输密码后密文也会变，不能跨设备复用密文）；补**提交前自查命令**（`git ls-files \| grep material` 为空才算合规，权威口径，`check-ignore` 对目录不可信）。坑点速查表同步 +安全理由。来源：Icey-Player-Harmony 实际踩坑 —— 该项目 `.gitignore` 只写了 `/signing/material/`、**漏掉 `/signing/debug/material/`**，导致 5 个 material 密钥文件长期在版本控制里（已 `git rm --cached` 移出并补规则）；同轮还实证「profile 与签名私钥不配套 ⇒ 安装报 9568322」「profile 设备白名单不含本机 UDID ⇒ 9568423」的判据。**教训**：`/signing/material/` 与 `/signing/debug/material/` **两条都要写**，只写一条 = 密钥照样入库 |
 | **v1.3.12** | 2026-10-12 | 新增 **LSN-039**（**共享元素「一镜到底」禁止与 `bindContentCover` 混用 —— 唯一正确形态是路由页 push/pop**）+ 坑点速查表 +1 行。来源：BiliDownload-Harmony 图片全屏预览，`geometryTransition` 挂在 `bindContentCover` 覆盖层里，**症状固定为「关闭时黑底连图片一起瞬间消失、看不到飞回」**，反复调 `modalTransition: NONE` / `transition: IDENTITY` / 黑底两段式淡出 / 覆盖层显式透明背景，**七八版都修不动**。★ 根因 = **结构冲突**（覆盖层一收起就立刻拆掉整棵子树 ⇒ 共享元素目标侧没了 ⇒ 没有回程可飞），不是参数问题。★ 破局判据 = **去官方 `transitions-collection` 里各数一遍**：`geometryTransition` 6 处**全在 push/pop 场景**；`bindContentCover` 2 处、**没有任何一处**配几何转场 ⇒ 官方从来不混用。✅ 正解 = 预览层改成**真正的路由页**（`NavDestination` + `.mode(DIALOG)` + `.hideTitleBar(true)`，注册进 `navDestinationBuilder`；⚠️ **不可当普通子节点挂**，否则 `NavDestination` 脱离 push/pop 会**立即渲染**——实测首页就冒出了预览层的按钮）；开 = 源页 `animateTo({250,EaseIn}, pushPath(…, false))`、关 = `animateTo({300,EaseIn}, pop(false))`；源侧缩略图**打开时让位 / 关闭时在同一个 animateTo 里复位**（官方 `isFirstPageShow` 同义，否则「源与目标同时在场」共享元素不知道跟谁）；两侧 `transition` **取值相反**（源侧缩略图 `opacity(0.99)` / 目标侧大图 `OPACITY`）。附「关闭回调走静态登记（`PreviewHost.setCloser`）而非预览页自己 pop」的解法 |
 | **v1.3.11** | 2026-10-07 | 新增铁律 **12** + **LSN-038**（**给 SDK 高级组件传「变长数组」当参数 ⇒ P0 真机闪退**）。来源：用 `SegmentButton` 做详情页分段切换，为让「2 项/3 项」共用一份构造代码，写成「补齐到 4 个元素 + 短位填 `undefined`」⇒ **点进详情页直接闪退**，真机堆栈锁死：`TypeError: Cannot read property icon of undefined` @ `segmentbutton.js:283 SegmentButtonItemOptions`。机理：`buttons` 是 **`SegmentButtonItemTuple` = 定长元组**（`ItemRestriction<T> = [T, T, T?, T?, T?]`，SDK d.ts:712），段数只能 2~5 且**必须按实际个数构造**；SDK 内部 `SegmentButtonItemOptionsArray` **逐元素读字段**（`item.icon`）⇒ 遇 `undefined` 即抛。正解 = 按段数分派到 `buildOptions2/3/4/5`（各写长度精确匹配的元组字面量）；⚠️ **别写 `as SegmentButtonItemTuple`**（三路联合类型，断言反而报 `not assignable`）。★ 通用判据：**看到 `T?` 结尾的元组就要警觉 —— 「能编译过」对 SDK 高级组件的结构约束没有说明力**；同组件的兄弟坑一并收录（不支持通用属性、`onItemClicked` 是构造参数、高度唯一旋钮 `buttonPadding`）。坑点速查表 +1 行 |
 | **v1.3.10** | 2026-10-06 | 新增铁律 **11** + **LSN-037**（**多级设置页的卡片间距/内边距必须一套组件一个口径**）。来源：用户连报两轮「设置页和子页的卡片间距不统一」「内边距也不统一，以设置页的为准」。两个缺口形态不同：**卡间距** = 子页卡片无 `margin.bottom`、全靠下一张卡的 `top` 隔开，而那个 `top` 比主页小 ⇒ 永远更紧；**内边距** = 子页组件按「有无标题」分了档（有标题 3/3、无标题 6/6）⇒ 带标题的卡上下窄 **3vp**，恰在肉眼可辨量级。判据要点：**必须严格一致的是「跨页同一视觉语言」（间距/内边距/圆角/材质档位）；允许不同的是「对齐自己那一侧内容」的缩进** —— 本例 Divider 左缩进主页 52（项带 32vp 图标）vs 子页 12（无图标）**是正确的**，一起统一反而错位。⚠️ **给同一元素做「按场景微调」前先算差值能不能被看见**（<2vp 不可辨、>4vp 明显 ⇒ 不该分档）。⚠️ 排查姿势：数值封在组件里 ⇒ `grep -rn "<组件名>" --include=*.ets` 下钻对比 `margin/padding/Divider`，并先确认没有页面覆写。坑点速查表 +1 行 |
