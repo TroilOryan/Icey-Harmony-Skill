@@ -1,0 +1,43 @@
+.idea/
+/.bitfun/
+/node_modules
+/oh_modules
+/.preview
+/build
+/.cxx
+local.properties
+/.hvigor
+oh-package-lock.json5
+# ===== 签名：打包文件全提交；material 不提交；密码只存密文 =====
+# p7b / cer / p12 / csr 是"工程可复现构建"的一部分，必须进仓库；
+# 整体忽略会导致新机器 clone 后编译不出可安装包（9568320 no signature file）。
+# material 不提交：它是 build-profile.json5 里密码密文的解密密钥，
+# 密文+密钥同入库 = 密码可被还原；且换设备重输密码后各自重新生成。
+# 明文密码绝不记录 —— build-profile.json5 里只有密文。
+# 换应用：只换 .p7b（profile 按 bundleName 绑定），cer/p12/csr 跨项目通用。
+/signing/material/
+/signing/debug/material/
+/release/material/
+
+# AI 开发记忆：结构化知识随仓库版本化（保证双设备开发一致性）；目录整体解忽略后仅把日常日志重新忽略
+.workbuddy/*
+# 项目级技能随仓库版本化（光感等沉淀）
+!.workbuddy/skills/
+# 结构化开发记忆（铁律/约定索引）跨设备同步
+!.workbuddy/memory/
+# 日常日志按设备本地保留，避免双设备同日提交冲突
+.workbuddy/memory/20[0-9][0-9]-*.md
+# 记忆缓存/临时产物不进仓库（同步策略见 .workbuddy/memory/MEMORY.md 顶部）
+.workbuddy/memory/cache/
+.workbuddy/memory/artifacts/
+/entry/build
+
+# AI 调试临时产物（截图 / 导出 / 假盘符目录 / 构建日志，勿提交）
+/tmp_*
+/screen_*.jpeg
+/vbar_*.jpeg
+/%SystemDrive%/
+/tools/tmp_*.log
+
+# hvigor 构建生成物（旧版会落在 entry/src/ 下，勿提交）
+/entry/src/BuildProfile.ets

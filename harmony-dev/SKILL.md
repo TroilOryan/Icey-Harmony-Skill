@@ -42,6 +42,7 @@ version: 1.0.0
 | --- | --- |
 | 从零起一个新鸿蒙 App、复用已验证基建（导航/路由/弹窗/设置持久化/主题/安全区/日志七件套） | **`references/harmony-app-template.md`**（主册，含 38 条铁律 / 坑点速查表 / 28 条 LSN） |
 | 要 W1~W8 工作流的**可复制代码**、文件职责表、模板工程副本 | `references/harmony-app-template/workflows.md`、`references/harmony-app-template/file-map.md`、`assets/template/`（56 文件可移植模板，编译全绿） |
+| 要**基建组件更全**的起点（SettingItem/SettingsGroup/SettingGroupCard/AppSwitch/MaterialLayer/DeviceProfile/WindowHelper/SheetManager 等，设置七件套 + init/waitReady 门闸） | `assets/harmony-standard/`（下一代标准工程副本，编译绿；与 v1.4 差异表见其 README，未替换 v1.4） |
 
 ### B. 编译 / 验证 / 排错（动手后必查）
 
@@ -370,7 +371,8 @@ harmony-dev/
 │   ├── crop-bottom.py / lsdir.py / show.py / unzip-stellarium.py
 └── assets/
     ├── TEMPLATE_MANIFEST.md      模板清单 / 排除项 / 同步约定
-    └── template/                 可移植模板工程副本（56 文件 / 1.2 MB，编译全绿）
+    ├── template/                 可移植模板工程副本（56 文件 / 1.2 MB，编译全绿）
+    └── harmony-standard/         下一代标准工程副本（基建全集 v2 草案，编译绿；README 含差异表）
 ```
 
 调用示例（`<skill>` = 本技能目录的绝对路径）：
