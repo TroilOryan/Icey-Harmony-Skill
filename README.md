@@ -33,6 +33,7 @@ harmony-dev/
 ├── scripts/            9 个可直接调用的诊断/构建脚本
 └── assets/             TEMPLATE_MANIFEST.md + template/（56 文件可移植模板工程，编译全绿）
                         + harmony-standard/（下一代标准工程副本，基建全集 v2 草案，编译绿）
+                        + design-resources/（华为设计资源：机框图 20 图 / 合规图标 6 包 / HarmonyOS Sans，78MB，只收成品）
 ```
 
 ## 任务路由表（入口 SKILL.md 的摘要）
