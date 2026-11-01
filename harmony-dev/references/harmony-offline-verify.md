@@ -196,6 +196,27 @@ entry/build/default/cache/default/default@CompileArkTS/esmodule/debug/entry/src/
 - `--experimental-strip-types` 不支持 `enum` / `namespace` / 构造函数参数属性；编译产物里通常没有。
 - 同一份 harness 加进"回归样本"后，以后改这条链路可以秒级复验。
 
+### 0c. 鸿蒙 PC 真编译：hmos-clt 命令行链（无 DevEco GUI 的第二开发机，2026-10-21 ~ 10-31 实测）
+
+```bash
+# 纯类型校验（~20s 级）与打包同形，换子命令即可
+DEVECO_SDK_HOME=/data/service/hnp/hmos-clt.org/hmos-clt_<版本>/sdk \
+NODE_OPTIONS=--jitless \
+  <hmos-clt>/node/bin/node --jitless <hmos-clt>/hvigor/bin/hvigorw.js \
+  --mode module -p product=default -p module=entry@default -p buildMode=debug \
+  default@CompileArkTS --no-daemon
+```
+
+三条环境坑（少一条必挂）：
+
+1. **`DEVECO_SDK_HOME` 要指到含 `default/openharmony` 的 `sdk` 目录**（指到 `sdk/default` 报 `00303312`）。
+2. **hvigor bootstrap 的 npm 必须用 hmos-clt 真 node**：`PATH` 前插 `<hmos-clt>/node/bin`。
+   DSH 随包的 node 是包装脚本 `exec node-cli`，缺 `libc++_shared.so` **必挂**。
+3. **系统内存压力大时 node 启动即崩**（hmos-clt 与 DSH 随包都中）：`Check failed: 12 == errno`（ENOMEM）
+   ⇒ **`NODE_OPTIONS=--jitless` 可绕**（不预留 JIT 映射区）。判据：命令还没跑完任务就段错误/abort 即中招。
+
+产物核验同 §0：`BUILD SUCCESSFUL` + `n executed`，再用 Grep 查产物里含本次改动的关键串（防假通过）。
+
 ### 1. ArkTS 静态一致性检查（无构建能力时的降级手段）
 
 ```bash

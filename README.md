@@ -29,7 +29,7 @@ cp -r ./harmony-dev ~/.workbuddy/skills/
 ```
 harmony-dev/
 ├── SKILL.md            入口：11 条通用铁律 + 任务路由表（触发场景 → 该读哪册）+ 本机环境坑
-├── references/         19 个领域分册（一字未删的实战沉淀）
+├── references/         21 个领域分册（一字未删的实战沉淀）
 ├── scripts/            9 个可直接调用的诊断/构建脚本
 └── assets/             TEMPLATE_MANIFEST.md + template/（56 文件可移植模板工程，编译全绿）
 ```
@@ -41,10 +41,10 @@ harmony-dev/
 | **基建 / 脚手架** | `references/harmony-app-template.md`（38 条铁律 / 8 条工作流 / 坑点速查表 / 28 条 LSN）+ `references/harmony-app-template/workflows.md`（W1~W8 可复制代码）+ `assets/template/` |
 | **编译 / 验证 / 排错** | `harmony-offline-verify.md`、`harmony-arkts-lint-fix.md`、`harmony-screenshot-layer-forensics.md`、`harmony-log-probe-cleanup.md`、`binary-asset-protocol.md` |
 | **弹窗 / 菜单 / 抽屉** | `harmony-sheet-panel.md`、`harmony-titlebar-menu.md`、`harmony-side-drawer.md` |
-| **观感 / 材质 / 背景** | `harmony-material-layer.md`、`harmonyos-arkts-custom-background.md`、`harmony-system-loading.md`、`harmony-symbol-outline-to-pixelmap.md` |
-| **能力接入 / 专项** | `harmony-form-card.md`（两册合并）、`harmony-friend-apps-page.md`（友情应用推荐页）、`harmony-reader-kit-integration.md`、`harmony-canvas-frame-pacing.md`、`stellarium-viewport-alignment.md`、`stellarium-hips-landscape.md` |
+| **观感 / 材质 / 背景** | `harmony-material-layer.md`、`harmonyos-arkts-custom-background.md`、`harmony-system-loading.md`、`harmony-symbol-outline-to-pixelmap.md`、`harmony-arkts-text-glow.md`（文字辉光/Canvas 装饰层） |
+| **能力接入 / 专项** | `harmony-form-card.md`（两册合并）、`harmony-friend-apps-page.md`（友情应用推荐页）、`harmony-reader-kit-integration.md`、`harmony-canvas-frame-pacing.md`、`harmony-arkts-transform-camera.md`（图形变换/相机投影）、`stellarium-viewport-alignment.md`、`stellarium-hips-landscape.md` |
 
-### 分册清单（20 册）
+### 分册清单（22 册）
 
 | 分册 | 用途 |
 | --- | --- |
@@ -53,7 +53,9 @@ harmony-dev/
 | `harmony-app-template/file-map.md` | 模板文件职责表 |
 | `binary-asset-protocol.md` | rawfile 定长二进制资产（星表/索引表/图数据）索引安全协议 |
 | `harmony-offline-verify.md` | 真编译验证（DevEco 自带 hvigorw）、逻辑端到端验证、二进制资产安全改动 |
-| `harmony-arkts-lint-fix.md` | ArkTS 严格模式编译错误系统性修复 + 真机 `undefined is not callable` / this 归属定位 |
+| `harmony-arkts-lint-fix.md` | ArkTS 严格模式编译错误系统性修复 + 真机 `undefined is not callable` / this 归属定位 + **静默失效家族**（响应式死依赖 / 持久化竞态 / 手势不识别 / 焦点键盘 / zIndex 图层 / 渲染口径） |
+| `harmony-arkts-text-glow.md` | 文字辉光终案（双层 Text）：`.shadow`=矩形色块、Canvas 辉光四连坑、`.blur` 余量 = 3×半径（3σ）、Canvas 重绘三要素 |
+| `harmony-arkts-transform-camera.md` | 图形变换矩阵序（T·R·S）与相机跟随投影 `T = 锚点 − s·cam` + Folia 类特效移植方法论 + 浮层定位/tooltip 裁切 |
 | `harmony-screenshot-layer-forensics.md` | 真机截图判定「图层/标签到底画没画出来」（掩膜 + 连通块） |
 | `harmony-log-probe-cleanup.md` | 清理遗留日志埋点/诊断日志，按唯一子串安全批量删改 |
 | `harmony-sheet-panel.md` | 半模态弹窗 `bindSheet` 自绘标题带 + 边缘渐变模糊完整范式（本库最大分册，36 KB） |
@@ -92,6 +94,7 @@ harmony-dev/
 | **hvigor 日志编码** | 日志是 **UTF-16 + ANSI 色码**，Read 直接拒读（"binary file"）→ 用 python 转码后读。`scripts/hvbuild.py` 已封装 |
 | **bash 缺 coreutils** | 本机 `bash` 常缺 `ls`/`grep`/`head`（command not found）→ 用 Glob / Grep / Read 专用工具，别走 bash |
 | **编译错误条数** | hvigor 报的 `COMPILE RESULT` ERROR 条数**常比列出的多一条**，别以为只差那一条 |
+| **鸿蒙 PC（第二开发机，2026-10-21 起）** | 无 DevEco GUI：走 **hmos-clt + `node hvigorw.js`**，`DEVECO_SDK_HOME` 指到含 `default/openharmony` 的 `sdk` 目录；node 内存压力大启动即崩 ⇒ `NODE_OPTIONS=--jitless`；hvigor 必须配 hmos-clt 真 node。详见 `harmony-dev/SKILL.md`「鸿蒙 PC 开发机」与 `references/harmony-offline-verify.md` §0c |
 | **同一文件禁止并行 Edit** | 并发 Edit **同一文件**时各自基于同一快照写盘、**后写覆盖前写**，且**每个都报 "Successfully edited"**。同文件多处改动必须**串行**；改完用 python 读字节复核 |
 | **帧内计时** | 禁用 `Date.now()`（1ms 分辨率 > 单次 Canvas 调用 10~20µs，分段全读 0）→ 用 `systemDateTime.getUptime(TimeType.STARTUP, true) / 1e6` |
 | **Git 提交信息** | 不要用 shell heredoc / `python -c` 内联写（反引号 `$` 被 shell 吃掉）→ Write 工具写到 `.workbuddy/cache/_msg.txt` 再 `git commit -F`，提交后 `git log -1 --format=%B` 复核 |

@@ -12,7 +12,9 @@ description: >-
   运行日志/AppLogger/清理埋点/诊断日志/更新日志；桌面卡片/服务卡片/widget/form/form_config/updateForm；
   编译报错/10505001/arkts-no-any-unknown/编译不过/改了没生效/hvigor 报错/点不动/命中失灵/白屏/空屏/无限 loading/正在排版/残留模糊；
   很卡/掉帧/跟手延迟/帧耗时/性能打点/Canvas 卡顿；阅读器/阅读页/Reader Kit；星图/Stellarium/HiPS/视野/fov/投影；
-  截图取证/图层没画出来；二进制资产/索引越界/星表体检。
+  截图取证/图层没画出来；二进制资产/索引越界/星表体检；
+  文字辉光/光晕/发光/辉光矩形/blur 裁切/Canvas 重绘；图形变换/相机投影/矩阵序/歌词特效移植/Folia/浮层定位/tooltip 被裁；
+  手势不识别/双指缩放/空格键/焦点/requestFocus/闪退/开关没反应/重启档位乱。
 agent_created: true
 version: 1.0.0
 ---
@@ -46,7 +48,7 @@ version: 1.0.0
 | 你要做什么 | 读哪册 |
 | --- | --- |
 | **改完 ArkTS 先真编译**（本机有 DevEco 自带 hvigorw，别假设没有）／纯逻辑用 Node 直跑编译产物验证／动 rawfile 定长二进制资产 | **`references/harmony-offline-verify.md`** + `scripts/hvbuild.py` 等 |
-| ArkTS 严格模式编译错误（10505001 / arkts-no-any-unknown …）系统性修复；真机 `undefined is not callable` / `this` 归属崩溃 | **`references/harmony-arkts-lint-fix.md`** |
+| ArkTS 严格模式编译错误（10505001 / arkts-no-any-unknown …）系统性修复；真机 `undefined is not callable` / `this` 归属崩溃；**编译通过但运行不对**（开关没反应/当前行钉死/切歌残留/手势不识别/空格键无反应/`requestFocus` 闪退/重启档位乱/zIndex 压不住） | **`references/harmony-arkts-lint-fix.md`** |
 | 用**真机截图**判定「图层/标签到底画没画出来」，拆「没画」还是「不在视野」 | `references/harmony-screenshot-layer-forensics.md` + `scripts/shot_forensics.py` |
 | 清理遗留日志埋点 / 诊断日志，按唯一子串安全批量删改源码 | `references/harmony-log-probe-cleanup.md` |
 | rawfile 二进制资产（星表 Float32 表 / 索引表 / 图数据）改动前的索引安全协议 | `references/binary-asset-protocol.md` + `scripts/bin-table-audit.mjs` |
@@ -69,6 +71,7 @@ version: 1.0.0
 | **自定义背景（壁纸）**：深浅色双槽位、模糊度滑块、选图落沙箱存 `file://`（禁 base64）、壁纸透出、重启后壁纸消失 | `references/harmonyos-arkts-custom-background.md` |
 | **加载态**：首屏 / 数据恢复 / 导入中的 loading（一律系统 `LoadingProgress`，禁自绘） | `references/harmony-system-loading.md` |
 | 系统符号 `sys.symbol.*` 画进 PixelMap / 离屏位图（播控封面、通知图标、卡片、分享图） | `references/harmony-symbol-outline-to-pixelmap.md` |
+| **文字辉光 / 光晕 / 发光**（歌词特效、霓虹字）：`.shadow` 出矩形色块、Canvas 辉光重影/裁切/resize 空白、`.blur` 边缘硬切出「文字矩形」 | **`references/harmony-arkts-text-glow.md`**（终案 = 双层 Text；blur 余量 = 3×半径） |
 
 ### E. 能力接入 / 专项
 
@@ -78,6 +81,7 @@ version: 1.0.0
 | **应用内「友情应用」推荐页**（多应用互推）：卡片版式、**卡片三级背景（沉浸光感，别写实色底）**、市场详情页直达（`store://`）、第三方深链边界、子页接线两处映射表 | **`references/harmony-friend-apps-page.md`** |
 | 华为 **Reader Kit** 阅读器接入：白屏、翻页裁切、单击不出工具栏、底色/字号不生效、路由与沙箱路径 | `references/harmony-reader-kit-integration.md` |
 | **Canvas 全屏自绘性能**（星图/地图/仪表）：很卡、跟手延迟、分段打点全是 0、调用数 > 数据量 | `references/harmony-canvas-frame-pacing.md` |
+| **图形变换 / 相机跟随投影**（内容缩放平移后跑偏、缩放中心不对、特效「完全不对/乱跳」）；Canvas 风格歌词特效（Folia 类）移植取舍；浮层定位不见（Swiper 页高≠窗高）、tooltip 被裁 | **`references/harmony-arkts-transform-camera.md`**（矩阵序 T·R·S / `T = 锚点 − s·cam`） |
 | 星图 **视野/投影/网格**口径对齐 Stellarium（fov 短边角 + 立体投影、离线量取角尺度） | `references/stellarium-viewport-alignment.md` |
 | 把 Stellarium **HiPS 实拍地景**（HEALPix 瓦片）离线烘焙成等距圆柱全景 | `references/stellarium-hips-landscape.md` |
 
@@ -263,6 +267,21 @@ version: 1.0.0
     🛠️ **用户要「你告诉我怎么调」时，别只给结论** —— 把他要调的每一项
     （高度 / 间距 / 内边距 / 圆角 / 字号）**对应到具体字段名 + 当前值 + 影响范围**，
     再给一个「每步只动一个变量」的推荐调试顺序，让他能自己一轮轮试出效果。
+29. **文字光晕 / 辉光一律双层 Text，禁 `.shadow`、禁 Canvas 辉光**（2026-10-31 四轮终案）。
+    `.shadow` 轮廓 = 组件矩形（暖色 accent 读作「黄框」）；Canvas 辉光是四连坑（矩形→重影→裁切→resize 空白）。
+    组件级 `.blur(n)` 必须留 **≥ 3×n** 的对称 padding 余量（高斯 3σ；**无需乘 scale**，blur×scale 模型已证伪），
+    `position`/`translate` 负偏移抵消。Canvas 通用：重绘时机三要素（onReady / **resize 静默清空位图** / 内容变化）
+    + 尺寸字段必须 `@State` + 装饰画布 `position` 脱离布局流。详见 `references/harmony-arkts-text-glow.md`。
+30. **图形变换先确认平台矩阵序再推公式**（2026-10-30 四轮实案）：ArkUI 属性合成 = **scale 先于 translate**
+    （矩阵序 T·R·S，`P' = T + s·P`，translate 后置不被缩放）⇒ 相机跟随投影正解 **`T = 锚点 − s·cam`**；
+    `.scale` 默认绕组件中心（画布语义要 `centerX/centerY: 0`）。诊断铁证：**偏差随内容深度（cam）线性增长
+    = 变换模型不匹配**。移植特效参数必须按目标视口重校准（公式正确 ≠ 效果正确）。
+    详见 `references/harmony-arkts-transform-camera.md`。
+31. **组件 build / @Builder 内读设置键 = 死依赖**（2026-10-30/31 三案复发）：`SettingsManager` 静态 getter
+    （内部读 AppStorage）在渲染路径上**不建立响应式依赖** ⇒ 开关打开了界面没反应。渲染路径一律 `@StorageLink`/`@Prop`
+    订阅；静态 getter 只用于事件回调/非渲染路径。新设置键**三处齐全**：启动预置 `setOrCreate` +
+    `applyRecord` 回填 + `flushToPrefs` 落盘（缺第一处 = 重启档位乱竞态）。详见 `harmony-arkts-lint-fix.md` §13~§15
+    （同节：手势对象必须内联、`requestFocus` 抛异常必 try/catch、`onKeyPreIme` 是 TextInput 专属）。
 
 ---
 
@@ -304,6 +323,14 @@ version: 1.0.0
 | **`hilog -r` 清缓冲后必须重启应用** | 清完缓冲直接 `aa start` 若是**已在运行**的实例，不会产生新日志 ⇒ grep 不到任何东西。**流程**：`aa force-stop <bundle>` → `hilog -r` → `aa start` → 操作 → `hilog -x \| grep` |
 | **日志行数本身就是判据** | 同窗口长度下「**万级 = 正常**、**十几万级 = 死循环**」。排查"卡住/转圈"类先数行数、再 grep 重复次数最高的那几行，比对逐个功能更快 |
 
+### 鸿蒙 PC 开发机（DSHM + hmos-clt，2026-10-21 起的第二开发机）
+
+| 坑 | 结论 |
+| --- | --- |
+| **沙箱 shell 无特权** | 本机 Agent shell 是**应用沙箱**（独立 uid / 进程命名空间）：`aa dump -l` 静默返回空（exit 0）、`hidumper`/`bm` 全部 Permission denied、`ps -A` 只见自身进程、`/data/app`、`/system/app` 不可读 ⇒ **无法枚举前台应用/其他应用包名**。特权上下文两条路：设备自带终端应用，或另一台机器 `hdc tconn` 连本机（需屏幕批准 connect-key）。真机取证 `hdc shell aa dump -l \| grep bundleName`（栈顶 = 前台） |
+| **hdc 本机自连不可用** | `hdc tconn 127.0.0.1:<port>` 无法建立目标（鸿蒙 HDC 本地回环非可用路径）；`hdc list targets` 为空时报 `need connect-key` 别重试回环 |
+| **node 启动即崩 / hvigor 链** | 内存压力大时 node V8 启动即崩 `Check failed: 12 == errno`（ENOMEM，hmos-clt 与 DSH 随包 node 都中）⇒ **`NODE_OPTIONS=--jitless` 绕过**；hvigor bootstrap 的 npm 必须用 **hmos-clt 真 node**（PATH 前插 `<hmos-clt>/node/bin`，DSH 的 node 包装脚本 `exec node-cli` 缺 `libc++_shared.so` 必挂）。完整命令与口径见 `references/harmony-offline-verify.md` §0c |
+
 ---
 
 ## 技能自带资源（本技能目录内）
@@ -318,6 +345,8 @@ harmony-dev/
 │   ├── harmony-offline-verify.md         编译验证主册
 │   ├── binary-asset-protocol.md          rawfile 定长二进制资产安全协议
 │   ├── harmony-arkts-lint-fix.md
+│   ├── harmony-arkts-text-glow.md         文字辉光/Canvas 装饰层（双层 Text 终案）
+│   ├── harmony-arkts-transform-camera.md  图形变换矩阵序/相机投影/特效移植
 │   ├── harmony-canvas-frame-pacing.md
 │   ├── harmony-form-card.md              桌面卡片（两册合并）
 │   ├── harmony-log-probe-cleanup.md
