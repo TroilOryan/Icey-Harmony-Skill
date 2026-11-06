@@ -15,9 +15,9 @@ export struct HomeDetailPage {
   build() {
     SubPageScaffold({ title: '组件演示' }) {
       List({ space: 16 }) {
-        // 子页内容顶部直接是卡片：第一个 ListItem 留白 112（SubPageScaffold 约定）
+        // 子页内容顶部直接是卡片：第一个 ListItem 留白 = SafeArea.top + 72
         ListItem() {
-          Row() {}.height(SafeArea.top + 64)
+          Row() {}.height(SafeArea.top + 72)
         }
 
         // 分组导航卡（图标 + chevron）

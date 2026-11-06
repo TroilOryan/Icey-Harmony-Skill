@@ -74,7 +74,8 @@ HDS 导航/标题栏/弹窗/设置组件/日志/持久化/主题/路由/安全�
 - `SubPageScaffold({ title: 'xxx' })` 承载（标题栏滚动模糊自动带上）
 - 内容用 `SettingsGroupCard({ title: '分组名' })` 分组：**标题在卡片上方**（13pt 次级色），
   卡内 `SettingItem` 排列，项间手动插 `Divider().strokeWidth(0.5).color(ThemeManager.colors.divider).margin({ left: 12, right: 8 })`
-- 顶部留白 `SafeArea.top + 64`；尾部留白 `SafeArea.bottom + 40`（滚到底不裁切）+
+- 顶部留白 `SafeArea.top + 72`（配首卡自带 `margin-top: 12` ⇒ 距屏顶 84 = 模糊带下缘）；
+  尾部留白 `SafeArea.bottom + 40`（滚到底不裁切）+
   `List.expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])`
 - 开关值链路：子页 `@StorageLink('settings_xxx')` 读 → `onSwitch` 调 `SettingsManager.setXxx(v)`
   → 内存 + AppStorage + 300ms 防抖落盘（重启保持）；加新设置项按 SettingsManager 注释三步
@@ -98,7 +99,7 @@ HDS 导航/标题栏/弹窗/设置组件/日志/持久化/主题/路由/安全�
    `.ignoreLayoutSafeArea([0], [0])`（背景/模糊带延伸铺满状态栏区——否则状态栏后面是白条/黑条）
 2. **根 Stack**：`.expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])`
    让背景绘制延伸到系统栏后面 + `.backgroundColor(ThemeManager.colors.background)` 填充状态栏露出的区域
-3. **页面内容让开**：List 第一个 ListItem `Blank().height(SafeArea.top + 64)`
+3. **页面内容让开**：List 第一个 ListItem `Blank().height(SafeArea.top + 72)`
    ——**不要硬编码 112**：公式 = SafeArea.top（状态栏，真机 ≈48，模拟器可能 0）+ MINI 标题栏 56 + 8 间距；
    动态化后换机型/折叠屏自动适配（tab 页与子页同公式，两边始终一致）
 4. **滚动模糊带 maskExtraHeight**：28（向下延伸高度）——调小让内容短的页（设置）模糊带

@@ -61,6 +61,14 @@ export struct SubPageScaffold {
       // 但 -22 全部抵消后内容(112)离标题栏底(104)仅 8vp、被滚动模糊带压顶（避免离标题栏太近）。
       // 折中 -10：内容 124（下去 12vp），与标题栏间距 20vp、模糊带不压内容。
       // embedded 宽屏右栏无 NavDestination 壳，无此偏移，不加。
+      //
+      // ⚠️⚠️ 这是**本工程实测值，不是通用常数**。移植前先核对两边的 Hds 层级：
+      //   若目标工程的 HdsNavDestination 已 `.ignoreLayoutSafeArea([0],[0])`（Icey-Reader 即如此），
+      //   照抄 -10 会凭空引入 10vp 假差值（用户读作「子页离顶部更小 / 还是靠下」）。
+      //   两侧留白公式 = Blank(safeAreaTop + 72) + 首卡自带 top(12) + 骨架 margin：
+      //     子页 = 72 + 12 + margin ；tab 页 = 72 + List space
+      //   Icey-Reader 定案：margin → 0、List space → 12 ⇒ 两侧同为 84 ✅
+      //   详见 harmony-app-template.md 铁律 07b / 14c。
       .margin({ top: this.embedded ? 0 : -10 })
       .backgroundColor(this.customBgUri ? Color.Transparent : ThemeManager.colors.background)
     }

@@ -49,7 +49,7 @@ export struct AboutPage {
     SubPageScaffold({ title: '关于' }) {
       List({ space: 16 }) {
         ListItem() {
-          Row() {}.height(SafeArea.top + 64)
+          Row() {}.height(SafeArea.top + 72)
         }
 
         ListItem() {

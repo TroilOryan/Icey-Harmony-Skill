@@ -9,6 +9,9 @@
 - 成片诡异级联错误（UI component cannot be used / Cannot find name xxx）
 - **真机运行时崩溃**：`TypeError: undefined is not callable` / `Cannot read property of undefined`，
   尤其"打开某个弹窗/菜单立刻闪退"（多为 `this` 归属问题，见 @Builder 规则）
+- **状态/手势/焦点类静默失效**（2026-10-30/31 批）：开关打开了界面没反应、当前行钉死、
+  切歌残留上一首内容、手势完全不识别、空格键无反应、启动闪退 `requestFocus`（§13~§16）
+- 重启后档位/样式恢复错乱（持久化竞态，§14）
 
 ## 核心诊断原则
 1. **先找根错误，级联后清**：成片 10505001/10905236（如 "Row cannot be used"、"Cannot find name margin"、"Scroll only one child"）几乎都是某文件/某组件**先发生编译错**的级联。用 `grep -oP "At File: E:[^ ]+" buildlog.txt` 按文件统计，先修每个文件的**第一个非级联错误**（尤其自定义组件自身文件，如 GlassCard.ets 失败会污染所有调用页）。
@@ -99,10 +102,51 @@
   ⇒ 卡片页模块级常量**一律带卡片后缀**（`NUM_OFFSET_Y_1X2`），或把常量挪进组件内部。
   ⚠️ 这类错误**不在宿主文件里**，改"设置/宿主"需求时极易漏看 —— 收尾必须真跑一次构建。
 
+- **🔴 自定义组件的尾随闭包之后**不能链式挂属性**（10505001 `Declaration or statement expected`
+  + `Cannot find name '<方法名>'`，**报错点是该方法的第一个字符**）**
+  ```ts
+  MaterialCard({ ... }) { ... }.layoutWeight(1)   // ❌ 被解析成「语句」而非「链式表达式」
+  MaterialCard({ ... }) { ... }.onCardTap(fn)     // ❌ 同上
+  SubPageScaffold({ ... }) { ... }.bindSheet(...) // ❌ 同上（附录 D7）
+  ```
+  **只有内置容器（`List`/`Scroll`/`Column`/`Row`）才支持**尾随闭包后链式调用。
+  **两种正确解法，按属性性质选**：
+  1. **通用布局属性**（`layoutWeight`/`width`/`padding`/`margin`…）→ **外层包一个 `Column`/`Row`**
+     承接，或把该属性写在内层的**原生组件**上；
+  2. **组件自定义的回调/参数**（如 `onCardTap`）→ 走**构造参数**，不要挂属性
+     （`MaterialCard({ ..., onCardTap: () => {...} })`）。这也顺带满足
+     「跨组件传回调用箭头包一层」那条（避免 `this` 归属错误）。
+  - **批量排查手法**（值得复用）：写脚本对全仓的自定义组件名按**花括号配平**找到闭合行，
+    检查**下一行是否以 `.` 开头** —— 一次定位全仓同类问题（本项目实测仅 1 处）。
+    ⚠️ 脚本一律用 **heredoc `python - <<'EOF'`**（`python -c "..."` 里引号/中文易被 shell 吃掉）。
+  - 出处：附录 **D7**（`bindSheet`）、**LSN-025**（插卡片边界时 `}`→`}`→`.width()`）。
+    本条是把「解法二（构造参数）」与「批量排查」补齐（2026-10-04 Icey-Reader 实测：
+    同一天内在 `GroupManagePage` 与 `SettingsTab` **各踩一次**，第二次即属性回调）。
+
+### ArkTS / 组件杂坑（2026-10-30/31 批，浮名/云阶移植实测）
+
+- **通用属性不能挂在 `if` 块之后**（悬空）：`.padding(...)` 写在 `if {...}` 后面 ⇒
+  10505001 `Declaration or statement expected` + `Cannot find name 'padding'`。
+  属性必须紧跟组件；`if` 两分支**各自挂齐**。
+- **自定义组件实例后不能直接链 `.margin()` 等通用属性**（2026-10-30 实测）⇒
+  外包 `Column` 容器承接（与上文「尾随闭包之后不能链式挂属性」同根，解法都是"外层容器承接"）。
+- **`Row` 没有 `flexWrap`** ⇒ 逐词流式排版用 `Flex({ wrap: FlexWrap.Wrap })` + `ForEach`。
+- **`Line` 的 `startPoint/endPoint` 元组语法坑** ⇒ 画十字/直线装饰改用两个 `Rect` 叠（行为稳定）。
+- **`Map` 的 `keys().next()` 需显式类型**（arkts-no-any）。
+- **`Length` → `number` 要显式转换**：`onAreaChange` 等回调给的是 `Length`（`string|number|Resource`），
+  arkts 禁隐式转换 ⇒ 显式转换后再参与数值计算。
+- **下拉选项顺序与枚举值解耦**：`LABELS: string[]` 按下标对应枚举值 ⇒ 调整显示顺序就**选错档**。
+  改**选项表 `{ style, label }`**，`ForEach` 绑 `style` 不绑 index；「关」就是关，
+  **禁造「标准」档充数**（用户定案 2026-10-30：下拉里不该有"标准"，关闭就是关闭）。
+
 ## 静默失效与命中排查（编译通过但运行不对）
 
 > 这类问题**编译零报错、日志无异常**，只能靠"看编译产物 + 按 zIndex/覆盖层列清单"定位。本工程（Icey-Reader）
 > 已各栽过一轮，结论固化如下。项目专属内容（双内核/导入管线/数据模型）不在此列，见其 `docs/`。
+
+### 1.5 ⚠️ 同形多分支的属性链必须逐项复制（2026-10-17 实报）
+新加渲染分支（如 `iconSymbol` vs `icon`）漏抄既有分支的 `.margin({right:12})` ⇒ 文字缩进提前 12vp。
+编译不报、只有真机观感暴露。复核 = 正则提取两分支属性链逐项 diff（详见 friend-apps-page §7.5）。
 
 ### 1. 🔴 struct 内禁用 `get` 访问器（命中率最高，2026-10-06 实证）
 - **症状**：派生值取到 `undefined`（`fontSize(undefined)` ⇒ 整行/整块不渲染）/ 参与运算变 `NaN`
@@ -250,6 +294,80 @@ grep -rn "=== 1 ? 1 : 0\|> 1 ? 1\|<= 1" entry/src/main/ets --include=*.ets
 - **后果**：任何靠"`aboutToDisappear`=用户主动离开"的判据**偶发失效**（用户说"有时候…"）。
 - **修法**：读 `AppStorage('appInBackground')` 区分前后台 + 在"主动退出唯一入口"处显式再做一次
   （两道独立防线，任一条失效另一条仍正确；取不到键按保守方向——该做没做是破坏性的，多做一次通常不是）。
+
+### 13. 🔴 组件 build / @Builder 内读设置键 = 死依赖（2026-10-30/31 三案复发，与 `harmony-material-layer` 铁律五同源）
+
+**症状族**：开关打开了界面没反应 / 歌词当前行钉死不切换 / 切歌残留上一首内容 / 重启直进后布局按错误尺寸算 —— 全部编译零报错。
+
+| 亚型 | 场景 | 修法 |
+|---|---|---|
+| a. **静态 getter 死依赖** | `isImmersiveLyricOn()` 读 `SettingsManager.xxx`（内部 `AppStorage.get`）出现在 build 分派里 —— ArkUI 只对 `this` 状态变量建依赖，键变化**不触发组件重跑** | 页面加 `@StorageLink('settings_xxx')`，分派读 `this.xxx`。**静态 getter 只能用在事件回调 / 非渲染路径** |
+| b. **宿主普通方法喂 @Prop** | 宿主私有方法读非响应式数据源（如 `AudioEngine.currentPosition`）算行/字进度传子组件 `@Prop` ⇒ **永不更新**，当前行钉死 | **子组件自治**：内部 `@StorageLink('currentPosition')` + 16ms tick 现算，**值变化才写 `@State`** |
+| c. **ForEach key 撞车** | key 只含 `sourceLineIndex+variant`，切歌后行文本变了但 key 仍是 `0_body/1_body…` ⇒ 组件复用旧闭包 = **残留上一首歌词** | `@State layoutEpoch`（文章重建时 +1）注入 key 强制全量重建（同 §4 的重建语义） |
+| d. **aboutToAppear 读窗口尺寸** | 早于 App 广播 ⇒ 读到 0 ⇒ 行数公式 `max(1, floor(0/100))=1` ⇒ 重启直进整行缩成一块；切进去时窗口已就绪所以正常 = 「只在重启触发」 | **以窗口尺寸为输入的布局绝不能只在 aboutToAppear 读一次**：`@StorageLink('windowHeight') @Watch` 重建，`viewH<=0` 忽略 |
+| e. **@StorageLink 同步是同步的**（口径） | 切换后读 `this.xxx` **已是新值** —— 按「旧值取反」判 toast 方向就反了 | 要「切前」语义：**先**用旧值算文案，再切换，再 toast |
+
+自查：`grep -rn "SettingsManager\." entry/src/main/ets/pages --include=*.ets`，逐个确认不在 build/@Builder 渲染路径上。
+
+### 14. 🔴 新设置键必须「启动预置」——缺了就是重启档位乱（2026-10-31 沉浸歌词实证）
+
+**症状**：重启后档位恢复成旧值（云阶 → 浮名），重选一次才对；写链路 / 读链路纸面推演都无断点。
+**根因**（持久化竞态）：新键**没有启动预置** —— `applyRecord` 异步读 preferences 回填**之前**，`@StorageLink` 挂载已用**组件默认值**创建该键 ⇒ 键被默认值占位，时序不定。项目先例：`mediaLayout` 同坑（注释 557 行）。
+**修法**：`SettingsManager` 预置区补 `AppStorage.setOrCreate(KEY, 默认档)`。新键**三处齐全**（与入口 SKILL.md 铁律 6 合并口径）：
+
+1. **启动预置** `setOrCreate`（本条，漏了 = 重启档位乱/竞态）；
+2. `applyRecord` 回填（漏了 = 重启不恢复）；
+3. `flushToPrefs` 落盘（漏了 = 杀进程丢设置）。
+
+**诊断法**：档位丢失纸面推演穷尽无断点 ⇒ **别再推了，在写入 / 回填 / 落盘三处加同 tag 日志埋点**，用户复现一次即实锤丢失环节（本例日志 `applyRecord immersiveLyric ← preferences 值=2` 一条结案）。
+
+### 15. 🔴 焦点与键盘事件家族（2026-10-31 启动闪退实证）
+
+- **`FocusController.requestFocus` 失败是抛异常，不是返回 false**（150002 "unfocusable ancestor"）：首帧祖先链（Swiper/HdsNavigation）尚未完成焦点注册时**必抛** ⇒ 任何时机调用必须 `try/catch`，失败可延迟重试一次，再失败放弃（功能降级但不闪退）。
+- **setTimeout 回调里的未捕获异常直接杀进程**（TimerCallback pending exception → HandleUncaughtException → exit）——「启动闪退但同步路径 try/catch 都写了」先查异步回调链。
+- **空格键全局监听正解**：`onKeyPreIme` 是 **TextInput 专属事件**，普通 Stack 收不到（实证，挂了没反应）。
+  正解 = 根容器 `.focusable(true).id('root')` + `onAppear` 里 `requestFocus`（try/catch）+ `.onKeyEvent`；输入框聚焦时焦点自然让渡，不冲突。
+- **API 细节**：`KeyType` 是**全局枚举**（`Down=0/Up=1`，`declarations/enums.d.ts`）无需 import；`@kit.InputKit` 无 `KeyType` 导出；`KeyEvent` 字段是 `type`（非 `keyAction`）、**无 `isRepeat`**；`onKeyPreIme` 签名 `Callback<KeyEvent, boolean>`（返回 `true` 消费）。
+- **同一快捷键两处挂载会同帧双触发**（toggle = 状态回弹）⇒ 只挂一处（全局根），删页内挂点。
+
+### 16. 🔴 手势静默失效家族（2026-10-21 实证，全部编译零报错）
+
+- **手势对象必须内联在 `.gesture()` / `.parallelGesture()` 括号里**：抽成
+  `private xxx(): PanGestureInterface { return ... }` 再传进去 ⇒ **完全不识别**（无 onActionStart、元素不动），
+  而同节点 `.onClick()` 正常 ⇒ 极易误判成「坐标/状态问题」。同一份代码内联后立刻正常。
+- 类型只能写 `PanGestureInterface` / `GestureGroupInterface`（`GestureGroup` 是值，用作类型报 *refers to a value*）。
+- 单指拖动与双指缩放旋转**分两档**：`.gesture` + `.parallelGesture`，不要混进一个 Parallel 组。
+- **一个手势基准值只能有一个写入者**：编辑态「双指捏合」与「单指拖角缩放」都写 `baseScale/baseRot` ⇒
+  偶发误识别会把元素甩到别处。多手势共享状态要么合并成一个识别器、要么各留各的字段；
+  **能用可见手柄就不要赌双指**（双指手势难触发，用户实测）。
+- **`onTouch` 是触摸监听、不吃手势优先级**：要在编辑/浮层态禁用某触摸控件，必须在它 `onTouch` 开头
+  自己 `if (某状态) return;`，光靠父层手势拦不住。
+- **手势容器的命中层**：纯透明容器（无 backgroundColor）可能拿不到手势落点，给 `0.4%` 黑即可（肉眼不可见）；
+  「框住元素」的编辑覆盖层**不要** `hitTestBehavior(Transparent)`，否则拖动与下层操作同时触发。
+
+### 17. ⚠️ 图层与坐标四连（2026-10-21 实证）
+
+- **`zIndex` 只在同一父容器的兄弟之间比较**：嵌套子元素 z 再高也出不了父层 ⇒ 要 A 压住 B，A/B 必须是**同一个父级**的兄弟。
+  顺带：**子元素必然继承父级的 offset/rotate/scale**（贴纸嵌在机身 wrapper 里，缩放机身贴纸跟着缩）⇒
+  桌面自由排布用**同层 Stack + 绝对基准偏移**（`deskBaseX()` 一处算基准）。
+- **Stack 里没写 zIndex = 后绘制的盖住先绘制的**（横屏封面流实证：中央那张被 dist 更大的压住一角）⇒
+  每张显式 `.zIndex(100 - |dist|)`；**竖屏/横屏两处都要改**。
+- **NavDestination 子页外层 Stack 叠层不渲染**：dump 无节点 + 截屏无像素 + hilog 数据链正常 ⇒ 直接断定「未渲染」；
+  右上悬浮层（索引条等）必须走 `DetailScaffold.rightOverlay` 插槽（HdsNavDestination 内部 Stack 顶层，与迷你条同层级）。
+- **`Scroll` 的 `scrollToIndex` 只数直接子组件**：`Scroll{Row{栏0;栏1}}` 结构下 index 恒 0、越界**静默不滚** ⇒
+  多栏横翻页一律 `scrollTo({ xOffset: 栏宽×i })` 像素定位；曲线用高阻尼弹簧 `springMotion(0.8, 1.0)`
+  （低阻尼过冲回弹读作「滑块后退」）。
+
+### 18. 渲染口径杂项（2026-10-21 用户定案 + 实证）
+
+- **拟物卡片文字一律墨色分档，不用白字**（用户原话「白色不是人写出来的」）：纯黑会「浮」，
+  用偏褐深墨（`#241A12`/`#3A2A1C`），层次只靠透明度分档（已唱 1.0 / 未唱 0.30 / 非当前行 0.40 / 副标题 0.60）；
+  **逐字**上色用 `Flex(wrap)+ForEach(词)`，别复用演唱会场 `KaraokeWords` 范式（Bold/float/scale 语义不同）。
+- **逐字合成会吃掉空格**（tokenizeText 跳过空白）⇒ 普通 LRC 合成逐字后 `"A - B (C)"` 渲染成 `"A-B(C)"`；
+  任何「整行拆词渲染」处都要按原文 `indexOf` 走一遍、把空白贴回前一个 token 尾部。
+- **索引条配套口径**：分组键必须拼音首字母（`firstLetterOf`；手写 `toUpperCase` 中文全堆 `#`）；
+  索引条显示时全宽元素统一 `rightInset 24`（用户定值：56 太多、16 不够），无索引条 16；
+  进度环 `ringColor` 跟页面文字对比色。
 
 ### 排查 SOP（点不动 / 不生效先看）
 1. 列全部整屏覆盖层（含 `opacity 0`）。按 `zIndex` 从高到低问"它吃不吃这一下"。

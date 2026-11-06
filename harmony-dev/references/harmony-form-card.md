@@ -162,7 +162,52 @@ FormLink({
 - ⚠️ 页面 `aboutToAppear` **绝不能** `setOrCreate('信号键', 0/'')` 归零：`setOrCreate` 是覆盖写，会抹掉 Ability 在页面构造前写入的信号（冷启动永远跳不过去）；且 `@Watch` 不对初始值触发，必须在 `aboutToAppear` 主动补一次。
 - 冷启动时数据可能未恢复：跳转前做「重试到数据就绪」（如 200ms × 15）并在消费后清空信号，避免重复压栈。
 
+## 5.5 卡片 API 白名单：权威核查方法（别靠记忆猜）
+
+卡片能用的组件/属性**不由文档决定，由本地 SDK 白名单文件决定**——文档写「支持部分组件」但不给清单，
+猜错就是编译期 `11706006 can't support form application.`（报错只给文件行号，不给"该用什么替代"）。
+
+**权威判据路径（DevEco 自带，离线可用）**：
+
+```
+<DevEco>/sdk/default/openharmony/ets/build-tools/ets-loader/form_components/*.json
+```
+
+- 目录下**每个 json 文件名 = 一个卡片可用组件**（`text.json` / `image.json` / `marquee.json` / `row.json` …）；
+  文件里 `attrs` 数组 = 该组件在卡片可用的属性**白名单**。
+- 查某属性能不能用：找到对应组件 json，看 `attrs` 里有没有它。
+- ⚠️ **属性在白名单 ≠ 该属性的所有枚举值都能用**（见下 MARQUEE 坑）——枚举值须以实际编译结果验证。
+
 ## 6. 卡片组件能力坑
+
+- 🚫 **卡片上不要用跑马灯（`Marquee` 组件），已验证会造成整卡数据不刷新**。
+  两条独立的坑：
+  1. **编译层**：`TextOverflow.MARQUEE` **不被卡片支持**，编译报 `11706006`
+     `'MARQUEE' can't support form application.`（`textOverflow` 属性在 `text.json` 白名单里，
+     但 `MARQUEE` 这个**取值**被单独拒绝）。
+  2. **运行时层（更隐蔽、更致命）**：改用白名单里独立的 `Marquee` 组件（`marquee.json`）能编译通过，
+     但 `Marquee` 的文本 `src` 是**组件构造参数**（`Marquee({ start, src })`）——
+     **ArkUI 的构造参数在 `@LocalStorageProp` 收到新值时不重新求值**（`Text(content)` 的文本内容
+     有响应式特化，`Marquee` 没有）。后果：`formProvider.updateForm` 推了新数据、卡片进程也收到了新的
+     `@LocalStorageProp` 值，但 `Marquee` 的 `src` 仍锁在首帧旧值 → **表现为"切歌、播放/暂停全都不更新"**
+     （排查极易误判为宿主没推 / formId 注册丢失，实际卡在卡片渲染层）。
+     系统另有明文限制：卡片上跑马灯**只滚动一次**（`marquee.d.ts`：
+     "Regardless of the value, the marquee scrolls only once on an ArkTS widget"）。
+  ⇒ **正解：卡片长文本用 `Text` + `maxLines(1)` + `textOverflow({ overflow: TextOverflow.Ellipsis })`**
+  （属性都在 `text.json` 白名单内），长文本以省略号收尾，不要追求滚动。
+- ⚠️ **通用铁律：卡片里优先用"内容型"组件 + 属性绑定，慎用"构造参数型"组件**。
+  只有 `Text` 这类把内容作为 `Text(content)` 传入的组件，其内容会被 ArkUI 重算；
+  任何把动态数据放进**构造参数**的组件（`Marquee({src})`、`Gauge({value})` 等）在
+  `@LocalStorageProp` 更新后都不会重算构造参数 → 数据"锁死"。卡片里要让动态数据显示，
+  首选 `Text` / `Image(src)`（`Image` 用 `memory://key` 变 key 触发重载，见铁律 1）。
+- ⚠️ **卡片文字/图标颜色要跟随背景深浅时，不要在卡片里 import 取色服务**：卡片跑在独立进程、
+  受 API 白名单约束，带 `effectKit`/`image` 的服务（如 `CoverColorExtractor`）不能进卡片上下文。
+  正解 = **宿主侧算好颜色字段再推**（与 `imageColorHex` 同模式）：宿主内联复刻亮度 + 混色两个纯函数
+  （`0.299R+0.587G+0.114B` 判深浅、基色 `#1A1A1A`/`#F5F5F5` 与主色混 15%），推 `textColorHex` /
+  `textColorSecondaryHex`（`#B3` + 一级色）/ 强调色；卡片端只消费字段，零计算零依赖。
+  半透明承载块（如 20% 白圆底）在浅封面上"白上白"看不见 ⇒ 推一个 `overlayBaseHex`
+  （浅背景 `000000` / 深背景 `FFFFFF`），卡片端 `'#33' + this.overlayBaseHex` 自行拼 alpha，
+  不必为每种透明度各推一个字段。
 
 - ✅ 支持：Row/Column/Stack/Text/Circle/Divider/Blank/List/ListItem/ForEach/image 等（含 @Builder、@LocalStorageProp）。
 - ❌ 不支持/不建议：`Grid`/`GridItem`（用 Row+Column+ForEach 自己分行）、左右滑动手势（与桌面分页冲突）、大图与复杂动画。
@@ -178,3 +223,144 @@ export JAVA_HOME="/c/Program Files/Huawei/DevEco Studio/jbr"
   --mode module -p product=default -p module=entry@default assembleHap --no-daemon
 # 看 CompileArkTS 是否 0 错误（PackageHap 失败常见于本机 java.dll 注册表问题，非代码问题）
 ```
+
+## 8. 应用内「会员身份卡 + 自定义卡片背景」接入清单（2026-10-16，Icey-Reader 三轮白屏换来的）
+
+> 适用场景：任意 Icey 系应用要接「开通后显示身份卡，且卡背景图可由用户自定义（浅/深双槽 + 模糊）」。
+> 参考实现：Icey-Player-Harmony `components/VipIdentityCard.ets`（base64 data URI 版）、
+> Icey-Reader 同名组件（`file://` 沙箱文件版）。**两边踩的坑不重叠，都读。**
+
+### 8.1 数据链（三键 + 一派生）
+- 槽位：`settings_vipCardBgEnabled` / `LightUri` / `DarkUri` / `Blur`（持久化）；
+- **派生键** `settings_vipCardBgUri`：`resolveEffectiveVipCardBg()` 按「开关开 + 当前深浅模式对应槽」解析写入，
+  **不落盘**，每次启动/切模式/换图重解析；卡片组件只读派生键，不自己判槽位。
+- 触发点收口：开关切换 / 任一槽位写入 / `applyColorMode` 尾部，**三处都要调 resolve**。
+
+### 8.2 卡片层序（player 定案，勿改动顺序）
+根 Stack：① `#111111` 黑金底（**常驻不切换**）→ ② 背景图层（有图才渲染）→ ③ 内容 Column（恒透明）。
+- 内容层**永远是最后一个子节点**且不参与条件渲染——混在 if 里会在状态翻转时整棵重建、内容偶发不挂载（「卡上啥都没有」的历史根因）。
+- 文字色：**有图且解码成功 → 跟当前深浅模式**（浅图深字/深图浅金字）；无图 → 恒金色。
+- 背景层双层结构：下层**同图实心**托底 + 上层 `.blur`——`.blur` 在图片边界按透明加权，单层必有四周缝隙。
+
+### 8.3 ⚠️ 三条铁律（每条都是真机实锤，违反必复现）
+1. **背景层尺寸兜底只能用常量**：`constraintSize({minWidth:300, minHeight:144})`。
+   ❌ 实测值回喂（`onAreaChange` → `@State cardH` → `minHeight: cardH`）= 正反馈，
+   卡片无限增高——指纹：`[AREA]` 日志**逐帧 +2**。`matchParent`×2 做主路径即可。
+2. **禁用 `.key()`**（测试专用 API，非测试目录行为未定义）；「换图强制刷新」靠
+   版本号 bump ⇒ `@StorageLink` 触发组件 rerender ⇒ `Image.create(uri)` 重读 src。
+   消费方页面 `aboutToAppear` bump 一次（`file://` URI 异步解码不随节点重建重发）。
+3. **宿主 List 禁挂 `fadingEdge`**：离屏渐隐遮罩会吞掉首屏「实底+图+blur」卡片的
+   **底色与背景层**（布局树全对但像素不画）。症状指纹：「布局树节点全对但不绘制」。
+   双向对照实验（撤属性/回挂各跑一轮真机）是唯一可信判据。
+
+### 8.4 排查顺序（会员卡「不显示/不刷新/变高」）
+1. 先看 `resolve` 日志：`effectiveLen=0` ⇒ 查开关/当前模式对应槽位是否为空（**别查渲染**）；
+2. `[AREA]` 是否逐帧上涨 ⇒ 正反馈，删掉一切「实测值 → 布局尺寸」的回流；
+3. `[AREA]` 从不打印 ⇒ 宿主布局未完成（条件渲染分支里的 ListItem），用常量兜底尺寸；
+4. 节点在、bounds 对、像素不画 ⇒ 查宿主 List 的 `fadingEdge`（本册 8.3-3）。
+
+### 8.5 接入步骤（新应用从零接，按序做完即等价 player/reader 现状）
+1. **SettingsManager 加六键 + 解析器**（照 Icey-Reader `SettingsManager.ets:119-135`）：
+   槽位三键（Enabled/LightUri/DarkUri）+ Blur + **派生键**（Uri，不落盘）+ **版本键**
+   （UriVersion，写槽位 +1，供 `.key()` 强制重建 Image）；
+2. **resolve 函数**：`resolveEffectiveVipCardBg()` —— 开关开 ⇒ 读当前模式对应槽 ⇒
+   写派生键 + 记日志（`effectiveLen=` 是排查锚点，必须打）；
+3. **三个触发点全部接**：开关切换 / 槽位写入 / `applyColorMode` 尾部（或深浅切换回调）。
+   漏一处 = "切模式背景不换"或"选图没反应"；
+4. **选图管线**：`CustomBgManager.pickVipCardBg(ctx, slot)` —— PhotoViewPicker 选 1 张 →
+   `FilePermission.persist+activate`（重启仍可读）→ **缩到 720 宽 → JPEG → 落沙箱文件**
+   （别存相册 URI：跨重启会失效）；清槽 = **先删文件再清槽位**（顺序不能反，幂等）；
+5. **共享组件** `VipIdentityCard`（数据组件自取，调用方只传展示参数）；
+   设置页与会员页**挂同一份**，禁止两处内联（player 三轮教训）；
+6. **会员门禁在生效侧再判**：UI 置灰不够，会员过期后槽位数据仍在 ⇒ resolve 前判
+   `isVip`（与 UI 层同源），非会员强制走默认卡；
+7. **云同步**：把四槽键（Enabled/Light/Dark/Blur）加进 `SYNC_SETTING_KEYS`；
+   派生键/版本键**必须排除**（见第 9 章 9.4）。
+
+### 8.6 两端参考实现的差异（按自家数据量选型）
+| | player 版 | reader 版 |
+|---|---|---|
+| 槽位 URI 形态 | base64 data URI 存 preferences | `file://` 沙箱文件（720 宽缩图落盘） |
+| 适用 | 卡片背景图小（几百 KB 内） | 图可能大；preferences 单值 8192 字节上限敏感 |
+| 已知代价 | preferences 膨胀 | 需 FilePermission.persist + 文件生命周期管理 |
+其余（六键结构 / resolve / 版本键 / 层序 / 文字色口径）**两端完全同构**，照抄即可。
+
+## 9. 应用内「设置云同步」接入清单（2026-10-16，Icey-Reader 从 rustdesk 移植 + player/reader 双端落地）
+
+> 适用场景：任意 Icey 系应用要接「设置项跨设备云备份与恢复」（会员功能）。
+> 参考实现：Icey-Reader `services/CloudSyncService.ets`（状态机 ~800 行）+
+> `CloudSyncSnapshotStore.ets`（快照 IO）+ `CloudSyncTask.ets`（错误/trace 类型）+
+> `CloudSyncBridge.ets`（解环注册表）+ `SettingsBackupService.ets`（载荷编解码）+
+> UI 层 `CloudSyncCard.ets`。**移植来源 rustdesk 的迁移评估文档
+> `docs/cloud-sync-migration-assessment.md` 是最值钱的一份，先读它。**
+
+### 9.1 架构（五文件分层，照抄即可）
+- `CloudSyncService` —— 状态机主服务（上传/下载/裁决/恢复，全部可靠性机制在这）；
+- `CloudSyncSnapshotStore` —— 快照 IO（UUID 追加命名、sha256、回读比对）；
+- `SettingsBackupService` —— 载荷编解码（`{format, schemaVersion, contentTime, sha256, content}` 信封）；
+- `CloudSyncBridge` —— **解环注册表**（见 9.3）；
+- `CloudSyncCard` —— UI 卡（挂会员中心已开通区；状态机三态 Idle/Syncing/Restoring）。
+
+### 9.2 冲突语义与可靠性机制（R 编号 = rustdesk 评估文档编号，**一个都不能删**）
+- **整包替换 + 墙钟 LWW，不是 merge**——设置项"每项独立、用户逐项调"，LWW 可接受；
+  要真 merge 的范本是 `ApiBookSync.ets`（逐项三方合并）。
+- R5 epoch 世代计数丢弃过期异步结果（每个 await 边界断言）；
+- R6 localRevision 丢弃被本地并发改动作废的结果（仍存基线但报 pending，**不谎报成功**）；
+- R7 单飞锁 + 请求合并（同 actionKey 返回同一个 promise）；
+- R9 还原后回读校验实际写入条数，不符报错而非成功；
+- R10 崩溃安全：基线只在系统确认完成后才推进（崩了下次重新裁决）；
+- **R13 空态防丢数据**：新设备不许上传空 / 云端空不许静默还原——
+  "全新安装的空本地状态"永远不能覆盖云端（**这是防丢数据的关键设计**）；
+- 两阶段恢复：预览铸造 ticket（仅内存）→ 确认时四重校验（ticket/epoch/revision/内容逐字节）。
+
+### 9.3 ⚠️ 接线三要点（漏一个 = 静默失败）
+1. **初始化顺序**：`SettingsManager.init` **必须最先**（EntryAbility onCreate 各模块独立
+   try-catch）；`CloudSyncService.init(ctx)` 在其后（注册桥），**不能在设置写入之前**——
+   否则 save() 经桥触发 markLocalChanged 时服务未就绪；
+2. **写入口收口**：`markLocalChanged()` 的触发点**唯一** —— `SettingsManager.save()` 统一调
+   （比"每个写入方各自调用"安全：一个入口漏不掉）。**循环依赖用 `CloudSyncBridge`
+   解**（依赖倒置注册表：Bridge 不 import 任何服务，恒为依赖树叶；ArkTS 循环 import
+   下静态初始化顺序不保证，直接互调会拿到 undefined）；
+3. **自动同步时机**（对齐 player）：`onForeground` ⇒ `syncNow`（回前台对账，LWW 裁决
+   不会误判）；`onBackground` ⇒ `upload`（退后台上传，防旧快照覆盖别设备新备份）。
+   两者都 catch 静默——UI 卡有手动入口，系统层不该打扰用户。
+
+### 9.4 ⚠️ 同步白名单（`SYNC_SETTING_KEYS`）三条纪律
+- **排除派生键**（`settings_customBgUri` / `settings_vipCardBgUri`）——同步它反而会把
+  本机沙箱路径写到另一台设备的槽位（文件不存在）；
+- **排除事件版本号键**（`xxxVersion`）——纯本机刷新信号；
+- URI 槽位键（`file://` 沙箱路径）**仍同步**：恢复侧填 AppStorage 后走 `resolveEffective*`，
+  无效路径只会让背景回落默认不会崩——与"开关/模糊值"保持同一份备份的完整性优先。
+- 白名单是**上传/恢复唯一依据**（`exportAll`/`applyAll` 双侧校验同一份 Set）；
+  未创建的键跳过、**不写默认值**（把"对方没设过"误当"显式设成默认"语义不同）。
+
+### 9.5 ⚠️⚠️ CloudDisk 快照存储的两个坑（原项目实测，"简化"掉必复现）
+1. **CloudDisk 上 rename 覆盖已有名字返回 EINVAL（实测 13900020）**——
+   天真的"写临时文件 + rename 覆盖固定名"本地测试通过、真机失败（最难查的静默失败）。
+   正解 = **追加式 UUID 命名 + 拒绝覆盖 + 旧定名文件保持可读**
+   （`cloud-sync-v2-<时间戳>-<UUID>.iceysync`；快照 ID 严格 basename 防路径穿越）；
+2. **损坏的"最新"快照绝不静默回退到旧快照**——静默回退可能把用户已删除的设置"复活"
+   （用户关掉自定义背景、恢复后又被打开）。宁可报错让用户选历史版本。
+- 其余：短写检测/回读比对/sha256（写入完整性）；**fsync 只对本地镜像做，不对云目录做**
+  （云盘虚拟文件系统不需要且有兼容风险）。
+
+### 9.6 能力授权（不是 permission）
+`context.cloudFileDir` 为空 = 用户未开系统「云盘同步」/ 未授权云空间——**应用无法自己授予**
+（官方行为）。判定后 UI 降级（卡片灰态 + 说明文案），不要报错误。
+
+### 9.7 UI 铁律（CloudSyncCard，同 player）
+- 同步期间**不阻塞**（`syncNow` 异步，UI 先切"同步中"再 await）；
+- 状态文案**区分 pending 与 failed**：超时/被作废/等确认 ⇒ 中性色"待处理"语气
+  （`result.pending`——**不是失败**，别显示成红色错误）；真失败才用错误色；
+- "进行中"态最短可见 420ms（服务快速返回时没有它 Syncing→Idle 同帧完成，"进行中"永不显示）；
+- 危险操作（恢复覆盖本机）走两阶段：预览列明"将恢复 N 项设置"→ 用户确认才写入。
+
+### 9.8 需替换的"每应用常量"清单（移植时 grep 一遍）
+| 常量 | reader 值 | 说明 |
+|---|---|---|
+| `CLOUD_FOLDER_NAME` | `Icey Reader` | 每应用云目录是共享的，必须自己划一块 |
+| `CLOUD_FILE_NAME` | `cloud-sync-v1.iceysync` | v1 定名文件（读取兼容位） |
+| `SNAPSHOT_FORMAT` | `IceyReaderCloudSnapshot` | 信封格式串（变更 = 破坏跨版本兼容） |
+| 后缀 | `.iceysync` | `.srdsync`→`.iceysync`（对照 rustdesk） |
+| `SYNC_SETTING_KEYS` | 本应用白名单 | 上传/恢复唯一依据 |
+| trace 出口 | `AppLogger`（`CloudSyncTrace.setSink` 注入） | 别用 console.*（进不了导出日志） |
