@@ -14,7 +14,8 @@ description: >-
   很卡/掉帧/跟手延迟/帧耗时/性能打点/Canvas 卡顿；阅读器/阅读页/Reader Kit；星图/Stellarium/HiPS/视野/fov/投影；
   截图取证/图层没画出来；二进制资产/索引越界/星表体检；
   文字辉光/光晕/发光/辉光矩形/blur 裁切/Canvas 重绘；图形变换/相机投影/矩阵序/歌词特效移植/Folia/浮层定位/tooltip 被裁；
-  手势不识别/双指缩放/空格键/焦点/requestFocus/闪退/开关没反应/重启档位乱。
+  手势不识别/双指缩放/空格键/焦点/requestFocus/闪退/开关没反应/重启档位乱；
+  商店宣传图/海报生成/竖稿横稿/截图重排/阴影裁切/宣传图硬边。
 agent_created: true
 version: 1.0.0
 ---
@@ -44,12 +45,14 @@ version: 1.0.0
 | 要 W1~W8 工作流的**可复制代码**、文件职责表、模板工程副本 | `references/harmony-app-template/workflows.md`、`references/harmony-app-template/file-map.md`、`assets/template/`（56 文件可移植模板，编译全绿） |
 | 要**基建组件更全**的起点（SettingItem/SettingsGroup/SettingGroupCard/AppSwitch/MaterialLayer/DeviceProfile/WindowHelper/SheetManager 等，设置七件套 + init/waitReady 门闸） | `assets/harmony-standard/`（下一代标准工程副本，编译绿；与 v1.4 差异表见其 README，未替换 v1.4） |
 | **宣传图底板 / 华为合规图标 / 官方字体**：商店截图真机机框图（Mate/Pura/Watch/平板/PC 20 图）、华为账号登录/分享/支付/应用市场/HarmonyOS LOGO 合规图标（PNG+SVG）、HarmonyOS Sans 字体 | `assets/design-resources/`（只收成品 PNG/SVG/TTF，源文件不收；清单与再同步方法见其 README） |
+| **商店宣传图 / 海报批量生成**（任何应用通用）：竖稿为源横稿管线重排、文案抠底、手机群软阴影安全裁切（bbox 硬边/羽化门控）、产物逐字节可复现 | **`references/store-promo-posters.md`** |
 
 ### B. 编译 / 验证 / 排错（动手后必查）
 
 | 你要做什么 | 读哪册 |
 | --- | --- |
 | **改完 ArkTS 先真编译**（本机有 DevEco 自带 hvigorw，别假设没有）／纯逻辑用 Node 直跑编译产物验证／动 rawfile 定长二进制资产 | **`references/harmony-offline-verify.md`** + `scripts/hvbuild.py` 等 |
+| Windows 上 native 交叉编译链炸（`Unable to find libclang` / `'stddef.h' not found` / `multiple input filenames provided` / `CRYPT_E_REVOCATION_OFFLINE` / bash 里 `grep: command not found` / 老版 nm 读不了 rustc 新 `.o`）；路径含空格（`Program Files`）引发的 RUSTFLAGS/环境变量分词问题；clone 后因 .gitignore 忽略的本地产物（预编译库/vendored crate/子模块树）缺失编不过 | **`references/windows-deveco-native-build.md`** |
 | ArkTS 严格模式编译错误（10505001 / arkts-no-any-unknown …）系统性修复；真机 `undefined is not callable` / `this` 归属崩溃；**编译通过但运行不对**（开关没反应/当前行钉死/切歌残留/手势不识别/空格键无反应/`requestFocus` 闪退/重启档位乱/zIndex 压不住） | **`references/harmony-arkts-lint-fix.md`** |
 | 用**真机截图**判定「图层/标签到底画没画出来」，拆「没画」还是「不在视野」 | `references/harmony-screenshot-layer-forensics.md` + `scripts/shot_forensics.py` |
 | 清理遗留日志埋点 / 诊断日志，按唯一子串安全批量删改源码 | `references/harmony-log-probe-cleanup.md` |
@@ -362,7 +365,8 @@ harmony-dev/
 │   ├── harmony-titlebar-menu.md
 │   ├── harmonyos-arkts-custom-background.md
 │   ├── stellarium-hips-landscape.md
-│   └── stellarium-viewport-alignment.md
+│   ├── stellarium-viewport-alignment.md
+│   └── store-promo-posters.md              商店宣传图/海报生成管线（竖稿源 + 阴影安全裁切）
 ├── scripts/                      ← 可直接调用的诊断/构建脚本
 │   ├── hvbuild.py                跨设备自动探测 hvigorw，剥 ANSI + 自适应 UTF-16/UTF-8 解码
 │   ├── decode-log.py             日志转码
