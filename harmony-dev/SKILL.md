@@ -6,6 +6,7 @@ description: >-
   入口只放铁律骨架 + 任务路由表，具体领域知识按需读 references/ 下的分册。
   触发词：鸿蒙/鸿蒙App/HarmonyOS/ArkTS/ArkUI/ETS/Stage 模型；新建项目/脚手架/模板工程/初始化/开工/新建页面/新增子页/加个Tab/HdsTabs/HdsNavigation/路由跳转/路由栈；
   设置页/设置项/持久化开关/preferences/存本地/存盘；
+  IAP/内购/应用内支付/付费/会员购买/queryProducts/商品价格/优惠/折扣/促销价/划线原价/首购优惠/订阅首购/introductoryOffer/促销码；
   转场/一镜到底/共享元素/geometryTransition/bindContentCover/图片预览/全屏预览/缩略图飞入飞出；弹窗/底部弹窗/bindSheet/半模态/确认弹窗/AppSheet/宽屏dialog/下拉菜单/标题栏菜单/openMenu/菜单分割线；
   主题/深浅色/暗色模式/自定义背景/壁纸/毛玻璃/沉浸光感/材质/GlassCard/模糊；
   安全区/状态栏/全屏/挖孔/标题栏/侧滑抽屉/抽屉；图标/加个图标/sys.symbol/系统符号/SymbolGlyph；
@@ -85,6 +86,7 @@ version: 1.0.0
 | **桌面服务卡片**（Form Kit）：三件套、`form_config.json`、静态卡片数据注入、卡片不刷新、`FormLink` 点击、背板透明开放能力；**会员身份卡+自定义卡背景**、**设置云同步**（LWW/快照/白名单/接线） | **`references/harmony-form-card.md`**（两册合并版；第 8/9 章） |
 | **应用内「友情应用」推荐页**（多应用互推）：卡片版式、**卡片三级背景（沉浸光感，别写实色底）**、市场详情页直达（`store://`）、第三方深链边界、子页接线两处映射表 | **`references/harmony-friend-apps-page.md`** |
 | 华为 **Reader Kit** 阅读器接入：白屏、翻页裁切、单击不出工具栏、底色/字号不生效、路由与沙箱路径 | `references/harmony-reader-kit-integration.md` |
+| **华为 IAP 内购的价格与折扣**：商品实时价显示（`localPrice`）、**促销价/临时调价划线原价**（`originalLocalPrice` 恒原价）、**订阅首购优惠**（`hasEligibilityForIntroOffer` + `introductoryOffer` 四种 paymentMode 文案翻译，自动结算无需传参）、促销码为何需要服务端签名；Text 划线属性叫 `.decoration` | **`references/harmony-iap-discounts.md`** |
 | **Canvas 全屏自绘性能**（星图/地图/仪表）：很卡、跟手延迟、分段打点全是 0、调用数 > 数据量 | `references/harmony-canvas-frame-pacing.md` |
 | **图形变换 / 相机跟随投影**（内容缩放平移后跑偏、缩放中心不对、特效「完全不对/乱跳」）；Canvas 风格歌词特效（Folia 类）移植取舍；浮层定位不见（Swiper 页高≠窗高）、tooltip 被裁 | **`references/harmony-arkts-transform-camera.md`**（矩阵序 T·R·S / `T = 锚点 − s·cam`） |
 | 星图 **视野/投影/网格**口径对齐 Stellarium（fov 短边角 + 立体投影、离线量取角尺度） | `references/stellarium-viewport-alignment.md` |
