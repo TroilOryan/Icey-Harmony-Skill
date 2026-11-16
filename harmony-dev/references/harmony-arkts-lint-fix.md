@@ -94,6 +94,11 @@
 - 匿名对象字面量必须对应**声明的 interface/class**（10605038）→ 定义接口；动态字段用点访问（`params.icon=`），禁止 `params['icon']`（10605029）。
 - interface 实例**不能传给 `Record<string, X>` 参数**（缺索引签名）→ http helper 的 query/body 参数类型改 `Object`，内部 `as Record<string, Object>`；或函数返回类型用具体接口（如 `Promise<HuaweiParseResult | null>`）。
 - 路由页必须有 `@Entry`（main_pages.json 已列但文件缺 → 10905402）。
+- **🔴 `@Entry` 页面 `build()` 根节点必须是容器组件**（2026-11-10 实测，报 10905210
+  `the 'build' method can have only one root node, which must be a container component`）：
+  把**自定义组件**（如封装好的引导/展示组件）直接作 `build()` 根 → 编译失败。
+  包一层容器（`Column() { MyShowcase({...}) }.width('100%').height('100%')`）即可。
+  静态对照 import/props 全对也拦不住这条——只有真编译能抓（QA 构建探测实证）。
 - **🔴 卡片/表单页的模块级变量名会跨文件撞**（2026-09-16 实测，报 10505001
   `Cannot redeclare block-scoped variable 'NUM_OFFSET_Y'`，报错**指向两个不同文件**）：
   `entry/src/main/ets/widget/pages/` 下的卡片页（`form_config.json` 的 src 指向的 `@Entry` 文件）
@@ -368,6 +373,21 @@ grep -rn "=== 1 ? 1 : 0\|> 1 ? 1\|<= 1" entry/src/main/ets --include=*.ets
 - **索引条配套口径**：分组键必须拼音首字母（`firstLetterOf`；手写 `toUpperCase` 中文全堆 `#`）；
   索引条显示时全宽元素统一 `rightInset 24`（用户定值：56 太多、16 不够），无索引条 16；
   进度环 `ringColor` 跟页面文字对比色。
+
+### 19. 🔴 `animateTo` 会放大 HDS 标题栏 bottomBuilder 重应用 → 搜索框"阴影闪烁"（2026-11-10 实证）
+
+- **表现**：视图切换（宫格⇄列表等）时挂在 `HdsNavigation` 标题栏 `bottomBuilder` 上的搜索框
+  **整胶囊 detach/reattach**，阴影明显消失重现（"闪烁"）。
+- **根因链**：HDS **不按 bottomBuilder 参数引用身份判变更**——`titleBar options` 每帧都是新对象
+  （menu 数组随状态重建），重应用必然发生；一旦某次状态变更被 `animateTo` 包住，重应用就落入
+  **隐式动画上下文**被放大成可见闪烁。打字走同一重应用路径但无 animateTo、无感知——机制自洽。
+  把 builder 参数**字段化单次构造**（稳定子对象引用）**不足以修复**：父 options 每帧新建，白改。
+- **修复（player 同款先例，layout/Index.ets:995-1005）**：视图切换状态变更**不包 animateTo**（快照式）；
+  容器高度 morph 需要平滑时用 **`.height(x).animation({duration,curve})` 属性动画原地承接**
+  （属性动画只作用于链上其前声明的属性，注意 `.animation` 与目标属性之间别插其它属性修饰符，
+  注释不占位）；单元格错峰过渡用自带 `transition(...)`（动画参数内联），与外层 animateTo 无关。
+- **通用化**：所有"HDS/Hds 组件 builder 参数 + 全局 animateTo"组合都有此坑；builder 挂在标题栏的
+  页面，切换类状态变更一律快照式。
 
 ### 排查 SOP（点不动 / 不生效先看）
 1. 列全部整屏覆盖层（含 `opacity 0`）。按 `zIndex` 从高到低问"它吃不吃这一下"。
