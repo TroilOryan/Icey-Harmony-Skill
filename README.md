@@ -43,10 +43,10 @@ harmony-dev/
 | **基建 / 脚手架** | `references/harmony-app-template.md`（38 条铁律 / 8 条工作流 / 坑点速查表 / 28 条 LSN）+ `references/harmony-app-template/workflows.md`（W1~W8 可复制代码）+ `assets/template/` |
 | **编译 / 验证 / 排错** | `harmony-offline-verify.md`、`harmony-arkts-lint-fix.md`、`harmony-screenshot-layer-forensics.md`、`harmony-log-probe-cleanup.md`、`binary-asset-protocol.md` |
 | **弹窗 / 菜单 / 抽屉** | `harmony-sheet-panel.md`、`harmony-titlebar-menu.md`、`harmony-side-drawer.md` |
-| **观感 / 材质 / 背景** | `harmony-material-layer.md`、`harmonyos-arkts-custom-background.md`、`harmony-system-loading.md`、`harmony-symbol-outline-to-pixelmap.md`、`harmony-arkts-text-glow.md`（文字辉光/Canvas 装饰层） |
+| **观感 / 材质 / 背景** | `harmony-material-layer.md`、`harmonyos-arkts-custom-background.md`、`harmony-system-loading.md`、`harmony-symbol-outline-to-pixelmap.md`、`harmony-arkts-text-glow.md`（文字辉光/Canvas 装饰层）、`harmony-tabbar-footer.md`（底部栏边距与配色，player 真源） |
 | **能力接入 / 专项** | `harmony-form-card.md`（两册合并）、`harmony-friend-apps-page.md`（友情应用推荐页）、`harmony-reader-kit-integration.md`、`harmony-canvas-frame-pacing.md`、`harmony-arkts-transform-camera.md`（图形变换/相机投影）、`stellarium-viewport-alignment.md`、`stellarium-hips-landscape.md` |
 
-### 分册清单（22 册）
+### 分册清单（25 册）
 
 | 分册 | 用途 |
 | --- | --- |
@@ -55,6 +55,7 @@ harmony-dev/
 | `harmony-app-template/file-map.md` | 模板文件职责表 |
 | `binary-asset-protocol.md` | rawfile 定长二进制资产（星表/索引表/图数据）索引安全协议 |
 | `harmony-offline-verify.md` | 真编译验证（DevEco 自带 hvigorw）、逻辑端到端验证、二进制资产安全改动 |
+| `windows-deveco-native-build.md` | Windows native 交叉编译坑（CMake/Rust/bindgen）：路径含空格分词、libclang/bindgen 双件套、吊销检查离线、工具链代差 |
 | `harmony-arkts-lint-fix.md` | ArkTS 严格模式编译错误系统性修复 + 真机 `undefined is not callable` / this 归属定位 + **静默失效家族**（响应式死依赖 / 持久化竞态 / 手势不识别 / 焦点键盘 / zIndex 图层 / 渲染口径） |
 | `harmony-arkts-text-glow.md` | 文字辉光终案（双层 Text）：`.shadow`=矩形色块、Canvas 辉光四连坑、`.blur` 余量 = 3×半径（3σ）、Canvas 重绘三要素 |
 | `harmony-arkts-transform-camera.md` | 图形变换矩阵序（T·R·S）与相机跟随投影 `T = 锚点 − s·cam` + Folia 类特效移植方法论 + 浮层定位/tooltip 裁切 |
@@ -64,15 +65,18 @@ harmony-dev/
 | `harmony-titlebar-menu.md` | 标题栏按钮弹出下拉菜单（`PromptAction.openMenu`），含「菜单一律无分割线」定案 |
 | `harmony-side-drawer.md` | 手机端自研侧滑抽屉：`SheetType.SIDE` 不生效、跟手黏手、全屏覆盖层阻塞命中 |
 | `harmony-material-layer.md` | 沉浸光感 / 材质完整落地：档位方向、官方默认档表、四种 scope、Toggle 承载层完整性清单 |
+| `harmony-tabbar-footer.md` | 底部导航栏统一规范（player 真源）：底边距公式 `2+max(SafeArea.bottom, is2in1?12:0)`、未选中纯黑/纯白、**PC 截图核对清单**（跨项目翻车三次台账） |
 | `harmonyos-arkts-custom-background.md` | 自定义背景（双槽位壁纸 + 模糊度）：选图落沙箱存 `file://`（禁 base64） |
 | `harmony-system-loading.md` | 加载态一律系统 `LoadingProgress`，禁自绘加载动画（用户定案） |
 | `harmony-symbol-outline-to-pixelmap.md` | 系统符号 `sys.symbol.*` 画进 PixelMap / 离屏位图 |
 | `harmony-form-card.md` | 桌面服务卡片（Form Kit）：三件套、数据注入、刷新、FormLink、背板透明（原两册合并） |
+| `harmony-iap-discounts.md` | 华为 IAP 价格与折扣：促销价/临时调价、订阅首购 introductoryOffer、促销码需服务端签名、划线原价判定 |
 | `harmony-friend-apps-page.md` | 应用内「友情应用」推荐页：横幅卡版式、**卡片三级背景（沉浸光感）**、市场直达、子页接线两处映射表 |
 | `harmony-reader-kit-integration.md` | 华为 Reader Kit 阅读内核接入：白屏、翻页裁切、单击不出工具栏 |
 | `harmony-canvas-frame-pacing.md` | Canvas 全屏自绘的帧率与跟手延迟诊断（打点口径 + 成本模型） |
 | `stellarium-hips-landscape.md` | Stellarium HiPS 实拍地景 → 离线烘焙等距圆柱全景 |
 | `stellarium-viewport-alignment.md` | 星图视野/投影/网格口径对齐 Stellarium（fov 短边角 + 立体投影） |
+| `store-promo-posters.md` | 商店宣传图/海报批量生成：竖稿为源横稿重排、文案抠底、软阴影安全裁切、产物逐字节可复现 |
 
 ## 技能自带脚本（`harmony-dev/scripts/`）
 

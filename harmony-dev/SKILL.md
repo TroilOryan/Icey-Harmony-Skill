@@ -9,7 +9,7 @@ description: >-
   IAP/内购/应用内支付/付费/会员购买/queryProducts/商品价格/优惠/折扣/促销价/划线原价/首购优惠/订阅首购/introductoryOffer/促销码；
   转场/一镜到底/共享元素/geometryTransition/bindContentCover/图片预览/全屏预览/缩略图飞入飞出；弹窗/底部弹窗/bindSheet/半模态/确认弹窗/AppSheet/宽屏dialog/下拉菜单/标题栏菜单/openMenu/菜单分割线；
   主题/深浅色/暗色模式/自定义背景/壁纸/毛玻璃/沉浸光感/材质/GlassCard/模糊；
-  安全区/状态栏/全屏/挖孔/标题栏/侧滑抽屉/抽屉；图标/加个图标/sys.symbol/系统符号/SymbolGlyph；
+  安全区/状态栏/全屏/挖孔/标题栏/侧滑抽屉/抽屉；底部栏/底栏/页签栏/底部导航/底栏贴底/底栏边距/barBottomMargin/底栏配色/未选中色/纯黑纯白；图标/加个图标/sys.symbol/系统符号/SymbolGlyph；
   运行日志/AppLogger/清理埋点/诊断日志/更新日志；桌面卡片/服务卡片/widget/form/form_config/updateForm；
   编译报错/10505001/arkts-no-any-unknown/编译不过/改了没生效/hvigor 报错/点不动/命中失灵/白屏/空屏/无限 loading/正在排版/残留模糊；
   很卡/掉帧/跟手延迟/帧耗时/性能打点/Canvas 卡顿；阅读器/阅读页/Reader Kit；星图/Stellarium/HiPS/视野/fov/投影；
@@ -78,6 +78,7 @@ version: 1.0.0
 | **加载态**：首屏 / 数据恢复 / 导入中的 loading（一律系统 `LoadingProgress`，禁自绘） | `references/harmony-system-loading.md` |
 | 系统符号 `sys.symbol.*` 画进 PixelMap / 离屏位图（播控封面、通知图标、卡片、分享图） | `references/harmony-symbol-outline-to-pixelmap.md` |
 | **文字辉光 / 光晕 / 发光**（歌词特效、霓虹字）：`.shadow` 出矩形色块、Canvas 辉光重影/裁切/resize 空白、`.blur` 边缘硬切出「文字矩形」 | **`references/harmony-arkts-text-glow.md`**（终案 = 双层 Text；blur 余量 = 3×半径） |
+| **底部导航栏（tabBar / 底栏）边距与配色**：底栏在 PC(2in1) 上**贴底没边距**、未选中色发灰难辨、新增/移植底部页签栏 | **`references/harmony-tabbar-footer.md`**（player 真源定案：底边距公式 + 未选中纯黑纯白 + PC 截图核对清单；已跨项目翻车三次） |
 
 ### E. 能力接入 / 专项
 
