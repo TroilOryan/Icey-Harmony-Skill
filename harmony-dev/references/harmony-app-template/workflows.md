@@ -50,7 +50,7 @@ cd <新工程根>
 
 | 要删的能力 | 删哪里 |
 |---|---|
-| 迷你播放条 | `layout/Index.ets` 的 `miniBar: {...}` 整个配置块 + `miniBarPlaceholder()` + `tabBarCollapsed` 相关判断 |
+| ~~迷你播放条~~（**模板默认已不携带**） | 无需删。仅当用户明确要求时才按下方「按需启用迷你播放条（mini cover）」整段加回 |
 | 自定义背景 / 毛玻璃 | `GlassCard` / `SettingsGroup` / `SettingsGroupCard` / `SubPageScaffold` 里的 `customBgUri` 判定（保留实色分支） |
 | 更新日志 | `services/ChangelogManager.ets` + `AboutPage` 对应 SettingItem + `EntryAbility` 的 init 调用 + `rawfile/changelog.txt` |
 | 运行日志 | `services/AppLogger.ets` + `AboutPage` 日志弹窗 + `EntryAbility.init`（注意 SettingsManager 内部也在用 AppLogger，删之前先 grep） |
@@ -58,6 +58,54 @@ cd <新工程根>
 | 图标字体 | `rawfile/fonts/sficons_harmony.ttf`（约 10MB，SFIcon 走 SVG 不依赖它） |
 
 > ⚠️ 删任何 service 前先 `grep -rn "<ServiceName>" <ETS>/` 确认没有跨模块引用。
+
+## 按需启用迷你播放条（mini cover）
+
+**默认不加。** 底部/右下角悬浮的迷你播放条（HdsTabs `barFloatingStyle.miniBar`，播放类应用的封面+标题+播控）
+**不是通用基建**，普通应用一律不带。只有用户明确说「要迷你播放条 / 底部播放条 / 迷你封面 / mini cover」时才加。
+
+内置模板 `assets/template/` 已默认不携带。需要时改 `layout/Index.ets` 四处（一次补齐，漏一处即编译失败或折叠态不更新）：
+
+1. import 补两个类型：
+
+```typescript
+  HdsBarStyle,
+  HdsTabsBarChangeMode,
+```
+
+2. 加折叠态状态：
+
+```typescript
+  /// tabBar 折叠态（Hds 自动折叠——小窗/展开 miniBar 时只显图标不显文字）
+  @State tabBarCollapsed: boolean = false;
+```
+
+3. `barFloatingStyle({...})` 里加 miniBar 配置块：
+
+```typescript
+            miniBar: {
+              miniBarBuilder: () => { this.miniBarPlaceholder(); },
+              onBarStyleChange: (miniBarStyle: HdsBarStyle, tabBarStyle: HdsBarStyle,
+                                 miniBarWidth: number, tabBarWidth: number,
+                                 mode: HdsTabsBarChangeMode) => {
+                this.tabBarCollapsed = tabBarStyle !== HdsBarStyle.EXPAND;
+              },
+            },
+```
+
+4. `TabItemBuilder` 里文字用折叠态包住，并把 `miniBarPlaceholder()` Builder 整段加回（封面+标题+播控+上滑展开播放页）：
+
+```typescript
+      if (!this.tabBarCollapsed) {
+        Text(label).fontSize(11)
+          .fontColor(this.currentIndex === index
+            ? ThemeManager.colors.tabBarActive : ThemeManager.colors.tabBarInactive)
+      }
+```
+
+> ⚠️ 加完必须真编译：`onBarStyleChange` 四个形参一个都不能少；`tabBarCollapsed` 必须在 `TabItemBuilder` 里被真正读到
+> （LSN-038：只声明不读不会刷新）。
+
 
 ---
 

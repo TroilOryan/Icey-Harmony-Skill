@@ -289,6 +289,10 @@ version: 1.0.0
     订阅；静态 getter 只用于事件回调/非渲染路径。新设置键**三处齐全**：启动预置 `setOrCreate` +
     `applyRecord` 回填 + `flushToPrefs` 落盘（缺第一处 = 重启档位乱竞态）。详见 `harmony-arkts-lint-fix.md` §13~§15
     （同节：手势对象必须内联、`requestFocus` 抛异常必 try/catch、`onKeyPreIme` 是 TextInput 专属）。
+32. **迷你播放条（miniBar / 右下角 mini cover）默认不加**（2026-11-17 用户定案）。它不是通用基建，
+    只有用户明确声明需要播放类 UI 才加。内置模板 `assets/template/` 已默认不携带；需要时按
+    `references/harmony-app-template/workflows.md`「按需启用迷你播放条（mini cover）」整段加回
+    （import / `@State tabBarCollapsed` / `miniBar` 配置 / Builder 四处必须齐全）。
 
 ---
 

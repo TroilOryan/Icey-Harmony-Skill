@@ -1,4 +1,6 @@
-/// 主布局（HdsNavigation + HdsTabs barFloatingStyle.miniBar 占位 + 系统深浅色）
+/// 主布局（HdsNavigation + HdsTabs barFloatingStyle + 系统深浅色）
+/// ⚠️ 迷你播放条（miniBar / 右下角 mini cover）默认不启用：只有用户明确声明需要播放类 UI 才加，
+///    见 references/harmony-app-template/workflows.md「按需启用迷你播放条（mini cover）」。
 /// 结构铁律（生产项目实战）：
 /// 1. Hds 枚举可用枚举名（compatibility 23+ 正常导出）；若兼容更低 API 设备闪退，
 ///    退回数值（GRADIENT_BLUR=2、HdsNavigationTitleMode.MINI=2、HdsNavDestinationTitleMode.MINI=100、
@@ -13,8 +15,6 @@ import {
   HdsTabs,
   HdsTabsController,
   HdsTabsFloatingStyle,
-  HdsBarStyle,
-  HdsTabsBarChangeMode,
   HdsNavigationTitleBarOptions,
   hdsMaterial,
 } from '@kit.UIDesignKit';
@@ -45,8 +45,6 @@ export struct Index {
   @StorageLink('settings_handedness') handedness: boolean = false;
   /// 数据加载完成（EntryAbility startupReady 恢复完打标）：列表页据此避免启动闪空态
   @StorageLink('dataLoaded') dataLoaded: boolean = false;
-  /// tabBar 折叠态（Hds 自动折叠——小窗/展开 miniBar 时只显图标不显文字）
-  @State tabBarCollapsed: boolean = false;
   /// 示例弹窗状态
   @State showDemoSheet: boolean = false;
   /// 路由栈：HdsNavigation 注入，子页 push/pop 走它（自带转场动画）
@@ -105,16 +103,6 @@ export struct Index {
             systemMaterialEffect: {
               materialType: hdsMaterial.MaterialType.ADAPTIVE,
               materialLevel: this.materialLevel,
-            },
-            // miniBar：迷你播放条占位（音乐/视频类应用参考同类实现；普通应用可整段删除）
-            miniBar: {
-              miniBarBuilder: () => { this.miniBarPlaceholder(); },
-              onBarStyleChange: (miniBarStyle: HdsBarStyle, tabBarStyle: HdsBarStyle,
-                                 miniBarWidth: number, tabBarWidth: number,
-                                 mode: HdsTabsBarChangeMode) => {
-                // tabBar 折叠态追踪（小窗/展开 miniBar 时只显图标）
-                this.tabBarCollapsed = tabBarStyle !== HdsBarStyle.EXPAND;
-              },
             },
           } as HdsTabsFloatingStyle)
           // tab 页预加载：启动时构建全部 tab（各页背景/图片启动阶段完成加载，切换无闪烁）
@@ -192,31 +180,15 @@ export struct Index {
         .fontSize(22)
         .fontColor([this.currentIndex === index
           ? ThemeManager.colors.tabBarActive : ThemeManager.colors.tabBarInactive])
-      if (!this.tabBarCollapsed) {
-        Text(label).fontSize(11)
-          .fontColor(this.currentIndex === index
-            ? ThemeManager.colors.tabBarActive : ThemeManager.colors.tabBarInactive)
-      }
+      Text(label).fontSize(11)
+        .fontColor(this.currentIndex === index
+          ? ThemeManager.colors.tabBarActive : ThemeManager.colors.tabBarInactive)
     }
     .width('100%').height(56)
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
     .borderRadius(16)
     .padding({ bottom: 4 })
-  }
-
-  /// miniBar 占位（音乐/视频类应用参考同类应用：封面+标题+播放控制+上滑展开播放页；
-  /// 普通应用整段删除 miniBar 配置即可）
-  @Builder
-  miniBarPlaceholder() {
-    Row() {
-      SymbolGlyph($r('sys.symbol.play_fill'))
-        .fontSize(20)
-        .fontColor([ThemeManager.colors.textPrimary])
-    }
-    .width('100%')
-    .height('100%')
-    .justifyContent(FlexAlign.Center)
   }
 
   /// 子页分发（AppRouter.push 的 name 对应；子页用 SubPageScaffold 承载标题栏）

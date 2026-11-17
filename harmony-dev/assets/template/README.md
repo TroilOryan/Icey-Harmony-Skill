@@ -11,7 +11,7 @@ HDS 导航/标题栏/弹窗/设置组件/日志/持久化/主题/路由/安全�
 ### 导航与页面结构
 | 基建 | 文件 | 说明 |
 |---|---|---|
-| HdsNavigation + HdsTabs 主布局 | `layout/Index.ets` | 底部悬浮导航（miniBar 占位可删）、tab 瞬时切换、预加载全 tab、逐层透明透出背景 |
+| HdsNavigation + HdsTabs 主布局 | `layout/Index.ets` | 底部悬浮导航（**默认无迷你播放条/mini cover**，播放类应用按需添加）、tab 瞬时切换、预加载全 tab、逐层透明透出背景 |
 | 滚动渐变模糊标题栏 | `model/TitleBarStyles.ets` | `buildHomeTitleBar`（主页大标题）/ `buildSubPageTitleBar`（子页返回）——GRADIENT_BLUR + ADAPTIVE 材质 + 主题色文字 |
 | 子页脚手架 | `components/SubPageScaffold/` | HdsNavDestination + 标题栏 + 自定义背景 + 宽屏 embedded 模式，一行代码建子页 |
 | 全局路由 | `model/AppRouter.ets` | 单例 NavPathStack，任意深层组件 push/pop，重复页面拦截 |
@@ -56,7 +56,7 @@ HDS 导航/标题栏/弹窗/设置组件/日志/持久化/主题/路由/安全�
 1. 复制整个目录到新工程目录，改 `AppScope/app.json5` 的 `bundleName` 和 `AppScope/resources/base/element/string.json` 的 `app_name`
 2. DevEco Studio 打开 → 自动关联 hvigor/SDK → build
 3. 删掉不需要的部分：
-   - 无播放条 → `Index.ets` 删除整个 `miniBar` 配置块和 `miniBarPlaceholder()`
+   - **需要迷你播放条（mini cover）** → 默认不带；仅当需求明确声明时按 `references/harmony-app-template/workflows.md` 的「按需启用迷你播放条（mini cover）」整段加回（import / 状态 / `miniBar` 配置 / Builder）。普通应用不要加
    - 无自定义背景 → 删 `GlassCard`/`SettingsGroup` 里的 `customBgUri` 判定（保留实色分支即可）
    - 无更新日志 → 删 ChangelogManager + AboutPage 对应项 + changelog.txt
 4. 在 `EntryAbility.startupReady` 里写你的数据恢复；在 `SettingsManager` 按注释三步加设置项
