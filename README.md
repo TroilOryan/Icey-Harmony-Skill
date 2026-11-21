@@ -43,10 +43,10 @@ harmony-dev/
 | **基建 / 脚手架** | `references/harmony-app-template.md`（38 条铁律 / 8 条工作流 / 坑点速查表 / 28 条 LSN）+ `references/harmony-app-template/workflows.md`（W1~W8 可复制代码）+ `assets/template/` |
 | **编译 / 验证 / 排错** | `harmony-offline-verify.md`、`harmony-arkts-lint-fix.md`、`harmony-screenshot-layer-forensics.md`、`harmony-log-probe-cleanup.md`、`binary-asset-protocol.md` |
 | **弹窗 / 菜单 / 抽屉** | `harmony-sheet-panel.md`、`harmony-titlebar-menu.md`、`harmony-side-drawer.md` |
-| **观感 / 材质 / 背景** | `harmony-material-layer.md`、`harmonyos-arkts-custom-background.md`、`harmony-system-loading.md`、`harmony-symbol-outline-to-pixelmap.md`、`harmony-arkts-text-glow.md`（文字辉光/Canvas 装饰层）、`harmony-tabbar-footer.md`（底部栏边距与配色，player 真源） |
+| **观感 / 材质 / 背景** | `harmony-material-layer.md`、`harmonyos-arkts-custom-background.md`、`harmony-system-loading.md`、`harmony-symbol-outline-to-pixelmap.md`、`harmony-arkts-text-glow.md`（文字辉光/Canvas 装饰层）、`harmony-tabbar-footer.md`（底部栏边距与配色，player 真源）、`harmony-interaction-feel.md`（交互手感/动效哲学，改编自 Apple WWDC，非视觉权威） |
 | **能力接入 / 专项** | `harmony-form-card.md`（两册合并）、`harmony-friend-apps-page.md`（友情应用推荐页）、`harmony-reader-kit-integration.md`、`harmony-canvas-frame-pacing.md`、`harmony-arkts-transform-camera.md`（图形变换/相机投影）、`stellarium-viewport-alignment.md`、`stellarium-hips-landscape.md` |
 
-### 分册清单（25 册）
+### 分册清单（26 册）
 
 | 分册 | 用途 |
 | --- | --- |
@@ -65,6 +65,7 @@ harmony-dev/
 | `harmony-titlebar-menu.md` | 标题栏按钮弹出下拉菜单（`PromptAction.openMenu`），含「菜单一律无分割线」定案 |
 | `harmony-side-drawer.md` | 手机端自研侧滑抽屉：`SheetType.SIDE` 不生效、跟手黏手、全屏覆盖层阻塞命中 |
 | `harmony-material-layer.md` | 沉浸光感 / 材质完整落地：档位方向、官方默认档表、四种 scope、Toggle 承载层完整性清单 |
+| `harmony-interaction-feel.md` | 交互手感 / 动效哲学（改编自 Apple WWDC *Designing Fluid Interfaces*，映射 ArkUI）：响应、1:1 跟手、中断性、弹簧、速度交接、动量投射、橡皮筋、多模态反馈、减弱动效；**仅手感参考，非视觉权威**（材质/配色/字体仍走 Hds） |
 | `harmony-tabbar-footer.md` | 底部导航栏统一规范（player 真源）：底边距公式 `2+max(SafeArea.bottom, is2in1?12:0)`、未选中纯黑/纯白、**PC 截图核对清单**（跨项目翻车三次台账） |
 | `harmonyos-arkts-custom-background.md` | 自定义背景（双槽位壁纸 + 模糊度）：选图落沙箱存 `file://`（禁 base64） |
 | `harmony-system-loading.md` | 加载态一律系统 `LoadingProgress`，禁自绘加载动画（用户定案） |

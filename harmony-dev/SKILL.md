@@ -16,7 +16,8 @@ description: >-
   截图取证/图层没画出来；二进制资产/索引越界/星表体检；
   文字辉光/光晕/发光/辉光矩形/blur 裁切/Canvas 重绘；图形变换/相机投影/矩阵序/歌词特效移植/Folia/浮层定位/tooltip 被裁；
   手势不识别/双指缩放/空格键/焦点/requestFocus/闪退/开关没反应/重启档位乱；
-  商店宣传图/海报生成/竖稿横稿/截图重排/阴影裁切/宣传图硬边。
+  商店宣传图/海报生成/竖稿横稿/截图重排/阴影裁切/宣传图硬边；
+  交互手感/跟手/中断性/弹簧动画/动量投射/回弹边界/按下即反馈/动效哲学/苹果设计规范借鉴（仅手感，非视觉权威）。
 agent_created: true
 version: 1.0.0
 ---
@@ -79,6 +80,7 @@ version: 1.0.0
 | 系统符号 `sys.symbol.*` 画进 PixelMap / 离屏位图（播控封面、通知图标、卡片、分享图） | `references/harmony-symbol-outline-to-pixelmap.md` |
 | **文字辉光 / 光晕 / 发光**（歌词特效、霓虹字）：`.shadow` 出矩形色块、Canvas 辉光重影/裁切/resize 空白、`.blur` 边缘硬切出「文字矩形」 | **`references/harmony-arkts-text-glow.md`**（终案 = 双层 Text；blur 余量 = 3×半径） |
 | **底部导航栏（tabBar / 底栏）边距与配色**：底栏在 PC(2in1) 上**贴底没边距**、未选中色发灰难辨、新增/移植底部页签栏 | **`references/harmony-tabbar-footer.md`**（player 真源定案：底边距公式 + 未选中纯黑纯白 + PC 截图核对清单；已跨项目翻车三次） |
+| **交互手感 / 动效哲学**（按下即反馈、1:1 跟手、中断性、弹簧曲线、速度交接、动量投射、橡皮筋边界）：界面「不跟手 / 像卡住 / 动效生硬」的评审与改法 | **`references/harmony-interaction-feel.md`**（改编自 Apple WWDC，映射 ArkUI；**手感参考，非视觉权威** —— 材质/配色/字体仍走 Hds） |
 
 ### E. 能力接入 / 专项
 
@@ -361,6 +363,7 @@ harmony-dev/
 │   ├── harmony-arkts-transform-camera.md  图形变换矩阵序/相机投影/特效移植
 │   ├── harmony-canvas-frame-pacing.md
 │   ├── harmony-form-card.md              桌面卡片（两册合并）
+│   ├── harmony-interaction-feel.md       交互手感/动效哲学（改编自 Apple WWDC，映射 ArkUI；非视觉权威）
 │   ├── harmony-log-probe-cleanup.md
 │   ├── harmony-material-layer.md
 │   ├── harmony-reader-kit-integration.md
